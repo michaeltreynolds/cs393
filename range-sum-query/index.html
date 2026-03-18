@@ -1,0 +1,1478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Range Sum Query Mutable — Interactive Demo</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0f0f1a;
+            --bg-secondary: #1a1a2e;
+            --bg-card: #16213e;
+            --bg-card-hover: #1a2744;
+            --accent-blue: #4fc3f7;
+            --accent-purple: #b388ff;
+            --accent-orange: #ffab40;
+            --accent-green: #69f0ae;
+            --accent-red: #ff5252;
+            --accent-yellow: #ffd740;
+            --accent-teal: #64ffda;
+            --text-primary: #e8eaf6;
+            --text-secondary: #9fa8da;
+            --text-muted: #5c6bc0;
+            --border-color: #283593;
+            --glass-bg: rgba(22, 33, 62, 0.7);
+            --glass-border: rgba(79, 195, 247, 0.15);
+            --shadow-glow: 0 0 30px rgba(79, 195, 247, 0.1);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background:
+                radial-gradient(ellipse at 20% 50%, rgba(100, 255, 218, 0.04) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 20%, rgba(179, 136, 255, 0.05) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 80%, rgba(255, 215, 64, 0.03) 0%, transparent 50%);
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px 30px 60px;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 30px 20px;
+            background: linear-gradient(135deg, var(--bg-card) 0%, rgba(26, 39, 68, 0.5) 100%);
+            border-radius: 20px;
+            border: 1px solid var(--glass-border);
+            box-shadow: var(--shadow-glow);
+        }
+
+        .header .badge {
+            display: inline-block;
+            background: linear-gradient(135deg, #ff6f00, #ff8f00);
+            color: white;
+            padding: 4px 14px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            margin-bottom: 12px;
+        }
+
+        .header h1 {
+            font-size: 2.2rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--accent-teal), var(--accent-purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            color: var(--text-secondary);
+            font-size: 1rem;
+            max-width: 700px;
+            margin: 0 auto;
+            line-height: 1.6;
+        }
+
+        /* Cards */
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .card {
+            background: var(--glass-bg);
+            border-radius: 16px;
+            border: 1px solid var(--glass-border);
+            padding: 24px;
+            backdrop-filter: blur(10px);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .card:hover { box-shadow: var(--shadow-glow); }
+
+        .card-title {
+            font-size: 0.85rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--accent-teal);
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .card-title::before {
+            content: '';
+            width: 4px;
+            height: 16px;
+            background: linear-gradient(to bottom, var(--accent-teal), var(--accent-purple));
+            border-radius: 2px;
+        }
+
+        .full-width { grid-column: 1 / -1; }
+
+        /* Problem */
+        .problem-body {
+            color: var(--text-secondary);
+            line-height: 1.7;
+            font-size: 0.9rem;
+        }
+        .problem-body code {
+            background: var(--bg-primary);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.82rem;
+            color: var(--accent-teal);
+        }
+        .problem-body .example {
+            background: var(--bg-primary);
+            border: 1px solid var(--glass-border);
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin: 10px 0;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.82rem;
+            color: var(--text-secondary);
+            white-space: pre-line;
+        }
+
+        /* Array Visualization */
+        .array-viz {
+            display: flex;
+            gap: 6px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin: 16px 0;
+        }
+
+        .array-cell {
+            min-width: 56px;
+            height: 56px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-primary);
+            border: 2px solid var(--border-color);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            position: relative;
+        }
+
+        .array-cell:hover {
+            border-color: var(--accent-teal);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(100, 255, 218, 0.2);
+        }
+
+        .array-cell.selected {
+            border-color: var(--accent-purple);
+            background: rgba(179, 136, 255, 0.1);
+        }
+
+        .array-cell.in-range {
+            border-color: var(--accent-blue);
+            background: rgba(79, 195, 247, 0.1);
+        }
+
+        .array-cell.updating {
+            border-color: var(--accent-orange);
+            background: rgba(255, 171, 64, 0.15);
+            animation: cellPulse 0.5s ease;
+        }
+
+        .array-cell .cell-value {
+            font-size: 1.1rem;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--text-primary);
+        }
+
+        .array-cell .cell-idx {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        @keyframes cellPulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.15); }
+            100% { transform: scale(1); }
+        }
+
+        /* BIT Tree Visualization */
+        .tree-canvas-wrapper {
+            width: 100%;
+            height: 320px;
+            background: linear-gradient(to bottom, #0a0a1a, var(--bg-primary));
+            border-radius: 12px;
+            border: 1px solid var(--glass-border);
+            overflow: hidden;
+            position: relative;
+        }
+
+        .tree-canvas-wrapper.tall {
+            height: 420px;
+        }
+
+        #tree-canvas, #segtree-canvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* View toggle */
+        .view-toggle {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 16px;
+        }
+
+        .view-toggle-btn {
+            padding: 8px 18px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            color: var(--text-muted);
+            font-family: 'Inter', sans-serif;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .view-toggle-btn.active {
+            background: linear-gradient(135deg, rgba(100, 255, 218, 0.15), rgba(179, 136, 255, 0.1));
+            color: var(--accent-teal);
+            border-color: var(--accent-teal);
+            box-shadow: 0 0 12px rgba(100, 255, 218, 0.15);
+        }
+
+        .view-toggle-btn:hover:not(.active) {
+            border-color: var(--text-muted);
+            color: var(--text-secondary);
+        }
+
+        .tree-view { display: none; }
+        .tree-view.active { display: block; }
+
+        /* Controls */
+        .controls-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 16px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 10px;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-teal), #00bfa5);
+            color: #0f0f1a;
+            box-shadow: 0 4px 15px rgba(100, 255, 218, 0.3);
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(100, 255, 218, 0.4);
+        }
+
+        .btn-secondary {
+            background: var(--bg-card);
+            color: var(--text-secondary);
+            border: 1px solid var(--border-color);
+        }
+        .btn-secondary:hover {
+            background: var(--bg-card-hover);
+            color: var(--text-primary);
+        }
+
+        .btn-purple {
+            background: linear-gradient(135deg, var(--accent-purple), #7c4dff);
+            color: white;
+            box-shadow: 0 4px 15px rgba(179, 136, 255, 0.3);
+        }
+        .btn-purple:hover {
+            transform: translateY(-2px);
+        }
+
+        .btn-orange {
+            background: linear-gradient(135deg, var(--accent-orange), #ff6d00);
+            color: #0f0f1a;
+            box-shadow: 0 4px 15px rgba(255, 171, 64, 0.3);
+        }
+
+        /* Input rows */
+        .action-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
+
+        .action-row label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            min-width: 100px;
+        }
+
+        .action-row input {
+            padding: 8px 12px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            width: 80px;
+        }
+        .action-row input:focus {
+            outline: none;
+            border-color: var(--accent-teal);
+            box-shadow: 0 0 0 3px rgba(100, 255, 218, 0.15);
+        }
+
+        /* Result display */
+        .result-display {
+            padding: 16px;
+            background: var(--bg-primary);
+            border-radius: 12px;
+            border: 1px solid var(--glass-border);
+            text-align: center;
+            margin-top: 12px;
+            min-height: 60px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .result-display .result-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+
+        .result-display .result-value {
+            font-size: 2rem;
+            font-weight: 800;
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--accent-teal);
+        }
+
+        /* Log */
+        .log-panel {
+            max-height: 200px;
+            overflow-y: auto;
+            padding: 10px;
+            background: var(--bg-primary);
+            border-radius: 10px;
+            border: 1px solid var(--glass-border);
+        }
+
+        .log-entry {
+            padding: 6px 10px;
+            font-size: 0.8rem;
+            border-left: 3px solid var(--accent-teal);
+            margin-bottom: 6px;
+            opacity: 0;
+            animation: fadeIn 0.3s ease forwards;
+            color: var(--text-secondary);
+        }
+
+        .log-entry.update { border-left-color: var(--accent-orange); }
+        .log-entry.query { border-left-color: var(--accent-blue); }
+        .log-entry.propagate { border-left-color: var(--accent-purple); }
+        .log-entry.init { border-left-color: var(--accent-green); }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Code panel */
+        .code-panel {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.78rem;
+            line-height: 1.7;
+            overflow-x: auto;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .code-line {
+            padding: 2px 12px;
+            white-space: pre;
+            border-left: 3px solid transparent;
+            transition: all 0.3s;
+            border-radius: 0 4px 4px 0;
+        }
+
+        .code-line.active {
+            background: rgba(100, 255, 218, 0.1);
+            border-left-color: var(--accent-teal);
+        }
+
+        .code-line .keyword { color: var(--accent-purple); }
+        .code-line .function { color: var(--accent-teal); }
+        .code-line .number { color: var(--accent-orange); }
+        .code-line .comment { color: var(--text-muted); font-style: italic; }
+        .code-line .line-num {
+            color: var(--text-muted);
+            margin-right: 16px;
+            user-select: none;
+            display: inline-block;
+            width: 24px;
+            text-align: right;
+        }
+
+        /* Complexity badges */
+        .complexity-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 12px;
+        }
+
+        .complexity-box {
+            padding: 12px;
+            background: var(--bg-primary);
+            border-radius: 10px;
+            border: 1px solid var(--glass-border);
+            text-align: center;
+        }
+
+        .complexity-box .ctype {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+
+        .complexity-box .cval {
+            font-size: 1.1rem;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .complexity-box .naive { color: var(--accent-red); }
+        .complexity-box .optimal { color: var(--accent-green); }
+
+        /* BIT explanation */
+        .bit-explain {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .bit-explain .explain-item {
+            flex: 1;
+            padding: 12px;
+            background: var(--bg-primary);
+            border-radius: 10px;
+            border: 1px solid var(--glass-border);
+            text-align: center;
+        }
+
+        .bit-explain .explain-item .etitle {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+        }
+
+        .bit-explain .explain-item .ebody {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        .bit-explain .explain-item code {
+            background: rgba(100, 255, 218, 0.1);
+            padding: 1px 4px;
+            border-radius: 3px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            color: var(--accent-teal);
+        }
+
+        /* Gospel */
+        .gospel-card {
+            background: linear-gradient(135deg, rgba(179, 136, 255, 0.08), rgba(100, 255, 218, 0.05));
+            border: 1px solid rgba(179, 136, 255, 0.2);
+        }
+
+        .gospel-card .card-title::before {
+            background: linear-gradient(to bottom, var(--accent-purple), var(--accent-yellow));
+        }
+
+        .gospel-card blockquote {
+            border-left: 3px solid var(--accent-purple);
+            padding: 12px 16px;
+            margin: 12px 0;
+            background: rgba(179, 136, 255, 0.05);
+            border-radius: 0 8px 8px 0;
+            font-style: italic;
+            color: var(--text-secondary);
+            line-height: 1.7;
+        }
+
+        .gospel-card .scripture-ref {
+            color: var(--accent-purple);
+            font-weight: 600;
+            font-style: normal;
+        }
+
+        .gospel-body {
+            color: var(--text-secondary);
+            line-height: 1.7;
+            font-size: 0.95rem;
+        }
+
+        .gospel-body strong {
+            color: var(--accent-yellow);
+        }
+
+        /* Tabs */
+        .tab-bar {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 16px;
+        }
+
+        .tab-btn {
+            padding: 8px 16px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px 8px 0 0;
+            color: var(--text-muted);
+            font-family: 'Inter', sans-serif;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            border-bottom: none;
+        }
+
+        .tab-btn.active {
+            background: var(--bg-card);
+            color: var(--accent-teal);
+            border-color: var(--accent-teal);
+        }
+
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* Responsive */
+        @media (max-width: 900px) {
+            .main-grid { grid-template-columns: 1fr; }
+            .full-width { grid-column: 1; }
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg-primary); }
+        ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="badge">LeetCode 307 · Medium</div>
+            <h1>🌳 Range Sum Query — Mutable</h1>
+            <p>Efficiently update elements and compute range sums using a Binary Indexed Tree (Fenwick Tree). Click cells to update, drag to select ranges!</p>
+        </header>
+
+        <div class="main-grid">
+            <!-- Problem Statement -->
+            <div class="card full-width">
+                <div class="card-title">Problem Statement</div>
+                <div class="problem-body">
+                    Given an integer array <code>nums</code>, handle two types of queries:
+                    <ul style="margin: 8px 0 8px 20px;">
+                        <li><code>update(index, val)</code> — set <code>nums[index]</code> to <code>val</code></li>
+                        <li><code>sumRange(left, right)</code> — return the sum of elements from index <code>left</code> to <code>right</code> (inclusive)</li>
+                    </ul>
+
+                    <strong>Key Insight:</strong> A naive approach gives O(n) for either update or query. A <strong>Binary Indexed Tree (BIT / Fenwick Tree)</strong> achieves O(log n) for <em>both</em> operations!
+
+                    <div class="complexity-grid">
+                        <div class="complexity-box">
+                            <div class="ctype">Naive Update + Prefix Sum</div>
+                            <div class="cval naive">O(1) update / O(n) query</div>
+                        </div>
+                        <div class="complexity-box">
+                            <div class="ctype">Naive Array + Sum Range</div>
+                            <div class="cval naive">O(n) update / O(1) query</div>
+                        </div>
+                        <div class="complexity-box">
+                            <div class="ctype">BIT / Fenwick Tree</div>
+                            <div class="cval optimal">O(log n) both!</div>
+                        </div>
+                        <div class="complexity-box">
+                            <div class="ctype">Segment Tree</div>
+                            <div class="cval optimal">O(log n) both</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Interactive Array + Controls -->
+            <div class="card full-width">
+                <div class="card-title">Interactive Array</div>
+                <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 12px;">
+                    Click a cell to select it for update. Click two cells to select a range for sum query. Use the buttons below for actions.
+                </p>
+                <div class="array-viz" id="array-viz"></div>
+
+                <div class="action-row">
+                    <label>✏️ Update:</label>
+                    <span style="font-size:0.85rem; color:var(--text-secondary);">Index</span>
+                    <input type="number" id="update-idx" value="0" min="0">
+                    <span style="font-size:0.85rem; color:var(--text-secondary);">New Value</span>
+                    <input type="number" id="update-val" value="10">
+                    <button class="btn btn-orange" onclick="doUpdate()">Update</button>
+                </div>
+
+                <div class="action-row">
+                    <label>📊 Sum Range:</label>
+                    <span style="font-size:0.85rem; color:var(--text-secondary);">Left</span>
+                    <input type="number" id="query-left" value="0" min="0">
+                    <span style="font-size:0.85rem; color:var(--text-secondary);">Right</span>
+                    <input type="number" id="query-right" value="3" min="0">
+                    <button class="btn btn-primary" onclick="doQuery()">Query Sum</button>
+                </div>
+
+                <div class="action-row">
+                    <label>📝 Array:</label>
+                    <input type="text" id="input-array" value="1, 3, 5, 7, 9, 11" style="flex:1; width: auto;">
+                    <button class="btn btn-secondary" onclick="reinitialize()">Reinitialize</button>
+                </div>
+
+                <div class="result-display" id="result-display">
+                    <div class="result-label">Result</div>
+                    <div class="result-value" id="result-value">—</div>
+                </div>
+            </div>
+
+            <!-- Tree Visualization -->
+            <div class="card full-width">
+                <div class="card-title">Data Structure Visualization</div>
+
+                <div class="view-toggle">
+                    <button class="view-toggle-btn active" onclick="switchTreeView('segtree')">🌳 Segment Tree (Nodes)</button>
+                    <button class="view-toggle-btn" onclick="switchTreeView('bit')">📊 Fenwick Tree (BIT)</button>
+                </div>
+
+                <!-- Segment Tree View -->
+                <div class="tree-view active" id="segtree-view">
+                    <div class="bit-explain">
+                        <div class="explain-item">
+                            <div class="etitle">Structure</div>
+                            <div class="ebody">A binary tree where each node stores the sum of its range. Leaves hold individual elements.</div>
+                        </div>
+                        <div class="explain-item">
+                            <div class="etitle">Update</div>
+                            <div class="ebody">Change a leaf, then <strong>propagate upward</strong> — each parent recalculates as the sum of its children.</div>
+                        </div>
+                        <div class="explain-item">
+                            <div class="etitle">Query</div>
+                            <div class="ebody">Traverse the tree, combining nodes whose ranges are fully within the query range.</div>
+                        </div>
+                    </div>
+                    <div class="tree-canvas-wrapper tall">
+                        <canvas id="segtree-canvas"></canvas>
+                    </div>
+                </div>
+
+                <!-- BIT View -->
+                <div class="tree-view" id="bit-view">
+                    <div class="bit-explain">
+                        <div class="explain-item">
+                            <div class="etitle">Key Trick</div>
+                            <div class="ebody">Use <code>i & (-i)</code> to find the lowest set bit. This determines which elements each tree node is responsible for.</div>
+                        </div>
+                        <div class="explain-item">
+                            <div class="etitle">Update Path</div>
+                            <div class="ebody">Add <code>i += i & (-i)</code> to walk up the tree, updating all ancestor nodes.</div>
+                        </div>
+                        <div class="explain-item">
+                            <div class="etitle">Query Path</div>
+                            <div class="ebody">Subtract <code>i -= i & (-i)</code> to accumulate prefix sums from ancestors.</div>
+                        </div>
+                    </div>
+                    <div class="tree-canvas-wrapper">
+                        <canvas id="tree-canvas"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Code + Log -->
+            <div class="card">
+                <div class="card-title">Python Solution</div>
+                <div class="tab-bar">
+                    <button class="tab-btn active" onclick="switchTab('bit')">Fenwick Tree (BIT)</button>
+                    <button class="tab-btn" onclick="switchTab('usage')">Usage Example</button>
+                </div>
+                <div class="tab-content active" id="tab-bit">
+                    <div class="code-panel" id="code-panel-bit"></div>
+                </div>
+                <div class="tab-content" id="tab-usage">
+                    <div class="code-panel" id="code-panel-usage"></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">Operation Log</div>
+                <div class="log-panel" id="log-panel"></div>
+                <div class="controls-row" style="margin-top: 8px;">
+                    <button class="btn btn-secondary" onclick="clearLog()">Clear Log</button>
+                </div>
+            </div>
+
+            <!-- Gospel Connection -->
+            <div class="card gospel-card full-width">
+                <div class="card-title">💡 Gospel Connection — Individual Contributions to the Whole</div>
+                <div class="gospel-body">
+                    <p>In a Fenwick Tree, <strong>every element contributes to the larger sum</strong>. When any single element changes, the tree efficiently propagates that change upward so the total is always accurate. No element is insignificant — each one matters to the whole.</p>
+
+                    <blockquote>
+                        "And he commanded them that...they should look forward with one eye, having one faith and one baptism, having their hearts <strong>knit together in unity</strong> and in love one towards another."
+                        <br><span class="scripture-ref">— Mosiah 18:21</span>
+                    </blockquote>
+
+                    <p>Like the Fenwick Tree, the body of Christ is made up of <strong>individual members whose contributions build up the whole</strong>. When one member serves, grows, or changes, it <strong>ripples upward</strong> and blesses the entire community. The O(log n) propagation mirrors how small, faithful acts can have <strong>far-reaching impact</strong> beyond what we might expect.</p>
+
+                    <p>The <code>prefix sum</code> operation teaches another truth: to understand the full picture, we must <strong>gather contributions from many sources</strong>. No single node holds the complete answer — it is only by <strong>combining our parts</strong> that we arrive at the whole truth. In Zion, "every man [seeks] the interest of his neighbor" (D&C 82:19), and together we are greater than the sum of our parts.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // ==============================
+    // BIT Code for display
+    // ==============================
+    const BIT_CODE = [
+        'class NumArray:',
+        '    def __init__(self, nums):',
+        '        self.n = len(nums)',
+        '        self.nums = [0] * self.n',
+        '        self.tree = [0] * (self.n + 1)',
+        '        for i, val in enumerate(nums):',
+        '            self.update(i, val)',
+        '',
+        '    def update(self, index, val):',
+        '        delta = val - self.nums[index]',
+        '        self.nums[index] = val',
+        '        i = index + 1  # BIT is 1-indexed',
+        '        while i <= self.n:',
+        '            self.tree[i] += delta',
+        '            i += i & (-i)  # add lowest set bit',
+        '',
+        '    def _prefixSum(self, index):',
+        '        s = 0',
+        '        i = index + 1',
+        '        while i > 0:',
+        '            s += self.tree[i]',
+        '            i -= i & (-i)  # remove lowest set bit',
+        '        return s',
+        '',
+        '    def sumRange(self, left, right):',
+        '        if left == 0:',
+        '            return self._prefixSum(right)',
+        '        return self._prefixSum(right) - self._prefixSum(left - 1)',
+    ];
+
+    const USAGE_CODE = [
+        '# Example usage:',
+        'nums = [1, 3, 5, 7, 9, 11]',
+        'obj = NumArray(nums)',
+        '',
+        '# Query sum of range [1, 3]',
+        'result = obj.sumRange(1, 3)  # 3 + 5 + 7 = 15',
+        '',
+        '# Update index 2 to value 10',
+        'obj.update(2, 10)',
+        '',
+        '# Query again',
+        'result = obj.sumRange(1, 3)  # 3 + 10 + 7 = 20',
+    ];
+
+    // ==============================
+    // State
+    // ==============================
+    let nums = [1, 3, 5, 7, 9, 11];
+    let bitTree = [];
+    let selectedCells = [];
+    let highlightedTreeNodes = [];
+    let highlightMode = ''; // 'update' or 'query'
+    let activeTreeView = 'segtree'; // 'segtree' or 'bit'
+
+    // Segment tree state
+    let segTree = [];
+    let segHighlightNodes = []; // indices in segTree array that are highlighted
+    let segHighlightMode = ''; // 'update' or 'query'
+    let segQueryRangeNodes = []; // nodes involved in query answer
+
+    // ==============================
+    // BIT implementation
+    // ==============================
+    function buildBIT(arr) {
+        const n = arr.length;
+        bitTree = new Array(n + 1).fill(0);
+        nums = [...arr];
+        const numsBackup = new Array(n).fill(0);
+        for (let i = 0; i < n; i++) {
+            numsBackup[i] = 0;
+        }
+        // Build by updating each element
+        for (let i = 0; i < n; i++) {
+            const delta = arr[i];
+            let j = i + 1;
+            while (j <= n) {
+                bitTree[j] += delta;
+                j += j & (-j);
+            }
+        }
+    }
+
+    // ==============================
+    // Segment Tree implementation
+    // ==============================
+    function buildSegTree(arr) {
+        const n = arr.length;
+        // Size the segment tree: 4 * n is safe
+        segTree = new Array(4 * n).fill(0);
+        if (n > 0) segBuild(arr, 1, 0, n - 1);
+    }
+
+    function segBuild(arr, node, start, end) {
+        if (start === end) {
+            segTree[node] = arr[start];
+        } else {
+            const mid = Math.floor((start + end) / 2);
+            segBuild(arr, 2 * node, start, mid);
+            segBuild(arr, 2 * node + 1, mid + 1, end);
+            segTree[node] = segTree[2 * node] + segTree[2 * node + 1];
+        }
+    }
+
+    function segUpdate(node, start, end, idx, val) {
+        if (start === end) {
+            segTree[node] = val;
+            return [node];
+        }
+        const mid = Math.floor((start + end) / 2);
+        let path;
+        if (idx <= mid) {
+            path = segUpdate(2 * node, start, mid, idx, val);
+        } else {
+            path = segUpdate(2 * node + 1, mid + 1, end, idx, val);
+        }
+        segTree[node] = segTree[2 * node] + segTree[2 * node + 1];
+        path.push(node);
+        return path;
+    }
+
+    function segQuery(node, start, end, l, r) {
+        if (r < start || end < l) return { sum: 0, nodes: [] };
+        if (l <= start && end <= r) return { sum: segTree[node], nodes: [node] };
+        const mid = Math.floor((start + end) / 2);
+        const left = segQuery(2 * node, start, mid, l, r);
+        const right = segQuery(2 * node + 1, mid + 1, end, l, r);
+        return { sum: left.sum + right.sum, nodes: [...left.nodes, ...right.nodes] };
+    }
+
+    function bitUpdate(index, newVal) {
+        const delta = newVal - nums[index];
+        nums[index] = newVal;
+        highlightedTreeNodes = [];
+        highlightMode = 'update';
+        let i = index + 1;
+        const path = [];
+        while (i <= nums.length) {
+            bitTree[i] += delta;
+            path.push(i);
+            i += i & (-i);
+        }
+        highlightedTreeNodes = path;
+        return path;
+    }
+
+    function bitPrefixSum(index) {
+        let s = 0;
+        let i = index + 1;
+        const path = [];
+        while (i > 0) {
+            s += bitTree[i];
+            path.push(i);
+            i -= i & (-i);
+        }
+        return { sum: s, path };
+    }
+
+    function bitSumRange(left, right) {
+        highlightMode = 'query';
+        if (left === 0) {
+            const res = bitPrefixSum(right);
+            highlightedTreeNodes = res.path;
+            return res.sum;
+        }
+        const r = bitPrefixSum(right);
+        const l = bitPrefixSum(left - 1);
+        highlightedTreeNodes = [...new Set([...r.path, ...l.path])];
+        return r.sum - l.sum;
+    }
+
+    // ==============================
+    // UI Functions
+    // ==============================
+    function renderArray() {
+        const container = document.getElementById('array-viz');
+        container.innerHTML = '';
+        nums.forEach((val, i) => {
+            const cell = document.createElement('div');
+            cell.className = 'array-cell';
+            cell.innerHTML = `<span class="cell-value">${val}</span><span class="cell-idx">[${i}]</span>`;
+            cell.onclick = () => handleCellClick(i);
+            container.appendChild(cell);
+        });
+    }
+
+    function handleCellClick(idx) {
+        selectedCells.push(idx);
+        if (selectedCells.length === 1) {
+            document.getElementById('update-idx').value = idx;
+            document.getElementById('query-left').value = idx;
+            highlightCells([idx], 'selected');
+        } else if (selectedCells.length >= 2) {
+            const left = Math.min(selectedCells[0], selectedCells[1]);
+            const right = Math.max(selectedCells[0], selectedCells[1]);
+            document.getElementById('query-left').value = left;
+            document.getElementById('query-right').value = right;
+            highlightRange(left, right);
+            selectedCells = [];
+        }
+    }
+
+    function highlightCells(indices, cls) {
+        document.querySelectorAll('.array-cell').forEach((c, i) => {
+            c.classList.remove('selected', 'in-range', 'updating');
+            if (indices.includes(i)) c.classList.add(cls);
+        });
+    }
+
+    function highlightRange(left, right) {
+        document.querySelectorAll('.array-cell').forEach((c, i) => {
+            c.classList.remove('selected', 'in-range', 'updating');
+            if (i >= left && i <= right) c.classList.add('in-range');
+        });
+    }
+
+    function doUpdate() {
+        const idx = parseInt(document.getElementById('update-idx').value);
+        const val = parseInt(document.getElementById('update-val').value);
+        if (isNaN(idx) || isNaN(val) || idx < 0 || idx >= nums.length) return;
+
+        const oldVal = nums[idx];
+        const path = bitUpdate(idx, val);
+
+        // Also update segment tree
+        const segPath = segUpdate(1, 0, nums.length - 1, idx, val);
+        segHighlightNodes = segPath;
+        segHighlightMode = 'update';
+
+        highlightCells([idx], 'updating');
+        addLog(`UPDATE: nums[${idx}] = ${val} (was ${oldVal}), delta = ${val - oldVal}`, 'update');
+        if (activeTreeView === 'bit') {
+            addLog(`  ↳ BIT path: indices [${path.join(' → ')}] updated`, 'propagate');
+        } else {
+            addLog(`  ↳ Segment tree: updated leaf → propagated up ${segPath.length} nodes`, 'propagate');
+        }
+
+        renderArray();
+        highlightCells([idx], 'updating');
+        setTimeout(() => { drawTree(); drawSegTree(); }, 50);
+
+        document.getElementById('result-value').textContent = `Updated [${idx}] = ${val}`;
+        document.getElementById('result-value').style.color = 'var(--accent-orange)';
+    }
+
+    function doQuery() {
+        const left = parseInt(document.getElementById('query-left').value);
+        const right = parseInt(document.getElementById('query-right').value);
+        if (isNaN(left) || isNaN(right) || left < 0 || right >= nums.length || left > right) return;
+
+        const result = bitSumRange(left, right);
+
+        // Also query segment tree for highlighting
+        const segResult = segQuery(1, 0, nums.length - 1, left, right);
+        segHighlightNodes = segResult.nodes;
+        segQueryRangeNodes = segResult.nodes;
+        segHighlightMode = 'query';
+
+        highlightRange(left, right);
+        addLog(`QUERY: sumRange(${left}, ${right}) = ${result}`, 'query');
+        if (activeTreeView === 'bit') {
+            addLog(`  ↳ BIT nodes queried: [${highlightedTreeNodes.join(', ')}]`, 'propagate');
+        } else {
+            addLog(`  ↳ Segment tree: combined ${segResult.nodes.length} node(s) for range sum`, 'propagate');
+        }
+
+        const breakdown = nums.slice(left, right + 1).join(' + ');
+        addLog(`  ↳ Verification: ${breakdown} = ${result}`, 'query');
+
+        setTimeout(() => { drawTree(); drawSegTree(); }, 50);
+
+        document.getElementById('result-value').textContent = result;
+        document.getElementById('result-value').style.color = 'var(--accent-teal)';
+    }
+
+    function reinitialize() {
+        try {
+            const arr = document.getElementById('input-array').value.split(',').map(s => parseInt(s.trim()));
+            if (arr.some(isNaN)) return;
+            buildBIT(arr);
+            buildSegTree(arr);
+            selectedCells = [];
+            highlightedTreeNodes = [];
+            segHighlightNodes = [];
+            segQueryRangeNodes = [];
+            renderArray();
+            drawTree();
+            drawSegTree();
+            document.getElementById('log-panel').innerHTML = '';
+            addLog(`Initialized with array: [${arr.join(', ')}]`, 'init');
+            document.getElementById('result-value').textContent = '—';
+            document.getElementById('result-value').style.color = 'var(--accent-teal)';
+            document.getElementById('update-idx').max = arr.length - 1;
+            document.getElementById('query-right').max = arr.length - 1;
+        } catch(e) {}
+    }
+
+    function addLog(msg, cls = '') {
+        const panel = document.getElementById('log-panel');
+        const entry = document.createElement('div');
+        entry.className = 'log-entry ' + cls;
+        entry.textContent = msg;
+        panel.appendChild(entry);
+        panel.scrollTop = panel.scrollHeight;
+    }
+
+    function clearLog() {
+        document.getElementById('log-panel').innerHTML = '';
+    }
+
+    // ==============================
+    // Tree Visualization
+    // ==============================
+    function drawTree() {
+        const canvas = document.getElementById('tree-canvas');
+        const ctx = canvas.getContext('2d');
+        const rect = canvas.parentElement.getBoundingClientRect();
+        canvas.width = rect.width * 2;
+        canvas.height = rect.height * 2;
+        ctx.scale(2, 2);
+        const W = rect.width;
+        const H = rect.height;
+        ctx.clearRect(0, 0, W, H);
+
+        const n = nums.length;
+        if (n === 0) return;
+
+        // Draw the BIT array as a bar chart with responsibility ranges
+        const padding = 50;
+        const barAreaW = W - padding * 2;
+        const barW = Math.min(60, (barAreaW / (n + 1)) - 8);
+        const gap = (barAreaW - barW * (n + 1)) / (n + 2);
+
+        const maxVal = Math.max(...bitTree.map(Math.abs), 1);
+        const scaleH = (H - padding * 2 - 60) / maxVal;
+        const baseY = H - padding;
+
+        // Title
+        ctx.fillStyle = '#5c6bc0';
+        ctx.font = 'bold 11px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('BIT Internal Array (1-indexed) — Each bar stores a partial sum', W / 2, 20);
+
+        // Draw responsibility ranges first (background)
+        for (let i = 1; i <= n; i++) {
+            const lsb = i & (-i);
+            const rangeStart = i - lsb + 1;
+            const rangeEnd = i;
+
+            const x1 = padding + gap * rangeStart + barW * (rangeStart - 1);
+            const x2 = padding + gap * (rangeEnd + 1) + barW * rangeEnd;
+            const y = baseY - Math.abs(bitTree[i]) * scaleH - 2;
+
+            // Range bracket
+            ctx.strokeStyle = `hsla(${(i * 47) % 360}, 60%, 60%, 0.15)`;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(x1, y);
+            ctx.lineTo(x2, y);
+            ctx.stroke();
+        }
+
+        // Draw bars
+        for (let i = 1; i <= n; i++) {
+            const x = padding + gap * (i + 1) + barW * i - barW;
+            const bh = Math.abs(bitTree[i]) * scaleH;
+            const y = baseY - bh;
+
+            // Shadow
+            ctx.fillStyle = 'rgba(0,0,0,0.3)';
+            ctx.fillRect(x + 2, y + 2, barW, bh);
+
+            // Bar
+            let grad;
+            const isHighlighted = highlightedTreeNodes.includes(i);
+            if (isHighlighted && highlightMode === 'update') {
+                grad = ctx.createLinearGradient(x, y, x, baseY);
+                grad.addColorStop(0, '#ffab40');
+                grad.addColorStop(1, '#ff6d00');
+            } else if (isHighlighted && highlightMode === 'query') {
+                grad = ctx.createLinearGradient(x, y, x, baseY);
+                grad.addColorStop(0, '#4fc3f7');
+                grad.addColorStop(1, '#0288d1');
+            } else {
+                grad = ctx.createLinearGradient(x, y, x, baseY);
+                grad.addColorStop(0, '#1a237e');
+                grad.addColorStop(1, '#0d1642');
+            }
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.roundRect(x, y, barW, bh, [4, 4, 0, 0]);
+            ctx.fill();
+
+            // Highlight border
+            if (isHighlighted) {
+                ctx.strokeStyle = highlightMode === 'update' ? '#ffab40' : '#4fc3f7';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.roundRect(x, y, barW, bh, [4, 4, 0, 0]);
+                ctx.stroke();
+            }
+
+            // Value label
+            ctx.fillStyle = isHighlighted ? '#fff' : '#9fa8da';
+            ctx.font = 'bold 11px JetBrains Mono, monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText(bitTree[i], x + barW / 2, y - 8);
+
+            // Index label
+            ctx.fillStyle = '#5c6bc0';
+            ctx.font = '10px JetBrains Mono, monospace';
+            ctx.fillText(`[${i}]`, x + barW / 2, baseY + 14);
+
+            // Responsibility range label
+            const lsb = i & (-i);
+            const rangeStart = i - lsb + 1;
+            ctx.fillStyle = '#3f51b5';
+            ctx.font = '9px JetBrains Mono, monospace';
+            if (lsb > 1) {
+                ctx.fillText(`sum[${rangeStart - 1}..${i - 1}]`, x + barW / 2, baseY + 28);
+            } else {
+                ctx.fillText(`nums[${i - 1}]`, x + barW / 2, baseY + 28);
+            }
+        }
+
+        // Draw the original nums array at the very top
+        ctx.fillStyle = '#5c6bc0';
+        ctx.font = '10px Inter, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(`Original: [${nums.join(', ')}]`, padding, H - 10);
+
+        // Draw arrows for highlighted path
+        if (highlightedTreeNodes.length > 1) {
+            ctx.strokeStyle = highlightMode === 'update' ? 'rgba(255, 171, 64, 0.6)' : 'rgba(79, 195, 247, 0.6)';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([6, 4]);
+            for (let k = 0; k < highlightedTreeNodes.length - 1; k++) {
+                const i1 = highlightedTreeNodes[k];
+                const i2 = highlightedTreeNodes[k + 1];
+                const x1 = padding + gap * (i1 + 1) + barW * i1 - barW / 2;
+                const x2 = padding + gap * (i2 + 1) + barW * i2 - barW / 2;
+                const y1 = baseY - Math.abs(bitTree[i1]) * scaleH - 20;
+                const y2 = baseY - Math.abs(bitTree[i2]) * scaleH - 20;
+
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.quadraticCurveTo((x1 + x2) / 2, Math.min(y1, y2) - 30, x2, y2);
+                ctx.stroke();
+
+                // Arrow head
+                const angle = Math.atan2(y2 - (Math.min(y1, y2) - 30), x2 - (x1 + x2) / 2);
+                ctx.setLineDash([]);
+                ctx.fillStyle = highlightMode === 'update' ? '#ffab40' : '#4fc3f7';
+                ctx.beginPath();
+                ctx.moveTo(x2, y2);
+                ctx.lineTo(x2 - 8 * Math.cos(angle - 0.4), y2 - 8 * Math.sin(angle - 0.4));
+                ctx.lineTo(x2 - 8 * Math.cos(angle + 0.4), y2 - 8 * Math.sin(angle + 0.4));
+                ctx.fill();
+                ctx.setLineDash([6, 4]);
+            }
+            ctx.setLineDash([]);
+        }
+
+        // Ground line
+        ctx.strokeStyle = 'rgba(100, 255, 218, 0.15)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(padding, baseY);
+        ctx.lineTo(W - padding, baseY);
+        ctx.stroke();
+    }
+
+    // ==============================
+    // Segment Tree node drawing
+    // ==============================
+    function drawSegTree() {
+        const canvas = document.getElementById('segtree-canvas');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const rect = canvas.parentElement.getBoundingClientRect();
+        if (rect.width === 0 || rect.height === 0) return;
+        canvas.width = rect.width * 2;
+        canvas.height = rect.height * 2;
+        ctx.scale(2, 2);
+        const W = rect.width;
+        const H = rect.height;
+        ctx.clearRect(0, 0, W, H);
+
+        const n = nums.length;
+        if (n === 0) return;
+
+        // Calculate tree depth
+        const depth = Math.ceil(Math.log2(n)) + 1;
+        const nodeRadius = Math.min(22, Math.max(14, W / (Math.pow(2, depth) * 2)));
+        const levelHeight = (H - 60) / depth;
+
+        function drawNode(node, start, end, level, xMin, xMax) {
+            if (node >= segTree.length || start > end) return;
+            const x = (xMin + xMax) / 2;
+            const y = 30 + level * levelHeight;
+            const mid = Math.floor((start + end) / 2);
+
+            // Draw edges to children first
+            if (start !== end) {
+                const leftX = (xMin + x) / 2;
+                const rightX = (x + xMax) / 2;
+                const childY = 30 + (level + 1) * levelHeight;
+
+                // Left edge
+                ctx.strokeStyle = segHighlightNodes.includes(2 * node) 
+                    ? (segHighlightMode === 'update' ? 'rgba(255, 171, 64, 0.7)' : 'rgba(79, 195, 247, 0.7)')
+                    : 'rgba(92, 107, 192, 0.3)';
+                ctx.lineWidth = segHighlightNodes.includes(2 * node) ? 2.5 : 1;
+                ctx.beginPath();
+                ctx.moveTo(x, y + nodeRadius);
+                ctx.lineTo(leftX, childY - nodeRadius);
+                ctx.stroke();
+
+                // Right edge
+                ctx.strokeStyle = segHighlightNodes.includes(2 * node + 1)
+                    ? (segHighlightMode === 'update' ? 'rgba(255, 171, 64, 0.7)' : 'rgba(79, 195, 247, 0.7)')
+                    : 'rgba(92, 107, 192, 0.3)';
+                ctx.lineWidth = segHighlightNodes.includes(2 * node + 1) ? 2.5 : 1;
+                ctx.beginPath();
+                ctx.moveTo(x, y + nodeRadius);
+                ctx.lineTo(rightX, childY - nodeRadius);
+                ctx.stroke();
+
+                // Draw children
+                drawNode(2 * node, start, mid, level + 1, xMin, x);
+                drawNode(2 * node + 1, mid + 1, end, level + 1, x, xMax);
+            }
+
+            // Draw node circle
+            const isHighlighted = segHighlightNodes.includes(node);
+            const isQueryNode = segQueryRangeNodes.includes(node) && segHighlightMode === 'query';
+
+            // Glow effect for highlighted nodes
+            if (isHighlighted) {
+                ctx.shadowColor = segHighlightMode === 'update' ? '#ffab40' : '#4fc3f7';
+                ctx.shadowBlur = 15;
+            }
+
+            // Node fill
+            if (isHighlighted && segHighlightMode === 'update') {
+                const grad = ctx.createRadialGradient(x, y, 0, x, y, nodeRadius);
+                grad.addColorStop(0, '#ffab40');
+                grad.addColorStop(1, '#ff6d00');
+                ctx.fillStyle = grad;
+            } else if (isQueryNode) {
+                const grad = ctx.createRadialGradient(x, y, 0, x, y, nodeRadius);
+                grad.addColorStop(0, '#4fc3f7');
+                grad.addColorStop(1, '#0288d1');
+                ctx.fillStyle = grad;
+            } else if (start === end) {
+                ctx.fillStyle = '#1a237e';
+            } else {
+                ctx.fillStyle = '#16213e';
+            }
+
+            ctx.beginPath();
+            ctx.arc(x, y, nodeRadius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+
+            // Node border
+            ctx.strokeStyle = isHighlighted
+                ? (segHighlightMode === 'update' ? '#ffab40' : '#4fc3f7')
+                : (start === end ? '#3949ab' : '#283593');
+            ctx.lineWidth = isHighlighted ? 2.5 : 1.5;
+            ctx.beginPath();
+            ctx.arc(x, y, nodeRadius, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // Node value
+            ctx.fillStyle = isHighlighted ? '#fff' : '#e8eaf6';
+            ctx.font = `bold ${Math.min(13, nodeRadius * 0.8)}px JetBrains Mono, monospace`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(segTree[node], x, y);
+
+            // Range label below node
+            const rangeLabel = start === end ? `[${start}]` : `[${start}-${end}]`;
+            ctx.fillStyle = isHighlighted ? (segHighlightMode === 'update' ? '#ffab40' : '#4fc3f7') : '#5c6bc0';
+            ctx.font = `${Math.min(9, nodeRadius * 0.5)}px JetBrains Mono, monospace`;
+            ctx.fillText(rangeLabel, x, y + nodeRadius + 10);
+        }
+
+        drawNode(1, 0, n - 1, 0, 20, W - 20);
+    }
+
+    function switchTreeView(view) {
+        activeTreeView = view;
+        document.querySelectorAll('.view-toggle-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tree-view').forEach(v => v.classList.remove('active'));
+        if (view === 'segtree') {
+            document.querySelector('.view-toggle-btn:nth-child(1)').classList.add('active');
+            document.getElementById('segtree-view').classList.add('active');
+            setTimeout(() => drawSegTree(), 50);
+        } else {
+            document.querySelector('.view-toggle-btn:nth-child(2)').classList.add('active');
+            document.getElementById('bit-view').classList.add('active');
+            setTimeout(() => drawTree(), 50);
+        }
+    }
+
+    // ==============================
+    // Code panel
+    // ==============================
+    function escapeHtml(str) {
+        return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function initCodePanel(id, lines) {
+        const panel = document.getElementById(id);
+        panel.innerHTML = '';
+        lines.forEach((text, i) => {
+            const div = document.createElement('div');
+            div.className = 'code-line';
+            let html = `<span class="line-num">${i + 1}</span>`;
+
+            // Split code and comment
+            const commentIdx = text.indexOf('#');
+            let codePart = commentIdx >= 0 ? text.substring(0, commentIdx) : text;
+            let commentPart = commentIdx >= 0 ? text.substring(commentIdx) : '';
+
+            // Escape and highlight code part
+            let processed = escapeHtml(codePart)
+                .replace(/\b(class|def|for|in|if|while|return|self)\b/g, '<span class="keyword">$1</span>')
+                .replace(/\b(len|enumerate|range)\b/g, '<span class="function">$1</span>')
+                .replace(/\b(\d+)\b/g, '<span class="number">$1</span>');
+
+            // Add comment with its own styling (escaped)
+            if (commentPart) {
+                processed += '<span class="comment">' + escapeHtml(commentPart) + '</span>';
+            }
+
+            html += processed;
+            div.innerHTML = html;
+            panel.appendChild(div);
+        });
+    }
+
+    function switchTab(tab) {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        if (tab === 'bit') {
+            document.querySelector('.tab-btn:nth-child(1)').classList.add('active');
+            document.getElementById('tab-bit').classList.add('active');
+        } else {
+            document.querySelector('.tab-btn:nth-child(2)').classList.add('active');
+            document.getElementById('tab-usage').classList.add('active');
+        }
+    }
+
+    // ==============================
+    // Init
+    // ==============================
+    window.addEventListener('load', () => {
+        initCodePanel('code-panel-bit', BIT_CODE);
+        initCodePanel('code-panel-usage', USAGE_CODE);
+        buildBIT([...nums]);
+        buildSegTree([...nums]);
+        renderArray();
+        setTimeout(() => { drawTree(); drawSegTree(); }, 100);
+        addLog('Initialized with array: [1, 3, 5, 7, 9, 11]', 'init');
+    });
+
+    window.addEventListener('resize', () => {
+        drawTree();
+        drawSegTree();
+    });
+    </script>
+</body>
+</html>
