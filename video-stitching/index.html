@@ -1,0 +1,1317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Stitching — Interactive Demo</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0f0f1a;
+            --bg-secondary: #1a1a2e;
+            --bg-card: #16213e;
+            --bg-card-hover: #1a2744;
+            --accent-blue: #4fc3f7;
+            --accent-purple: #b388ff;
+            --accent-orange: #ffab40;
+            --accent-green: #69f0ae;
+            --accent-red: #ff5252;
+            --accent-yellow: #ffd740;
+            --accent-teal: #64ffda;
+            --text-primary: #e8eaf6;
+            --text-secondary: #9fa8da;
+            --text-muted: #5c6bc0;
+            --border-color: #283593;
+            --glass-bg: rgba(22, 33, 62, 0.7);
+            --glass-border: rgba(79, 195, 247, 0.15);
+            --shadow-glow: 0 0 30px rgba(79, 195, 247, 0.1);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background:
+                radial-gradient(ellipse at 20% 50%, rgba(100, 255, 218, 0.04) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 20%, rgba(179, 136, 255, 0.05) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 80%, rgba(255, 215, 64, 0.03) 0%, transparent 50%);
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px 30px 60px;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 30px 20px;
+            background: linear-gradient(135deg, var(--bg-card) 0%, rgba(26, 39, 68, 0.5) 100%);
+            border-radius: 20px;
+            border: 1px solid var(--glass-border);
+            box-shadow: var(--shadow-glow);
+        }
+
+        .header .badge {
+            display: inline-block;
+            background: linear-gradient(135deg, #ff6f00, #ff8f00);
+            color: white;
+            padding: 4px 14px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            margin-bottom: 12px;
+        }
+
+        .header h1 {
+            font-size: 2.2rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--accent-teal), var(--accent-purple));
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            color: transparent;
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            color: var(--text-secondary);
+            font-size: 1rem;
+            max-width: 700px;
+            margin: 0 auto;
+            line-height: 1.6;
+        }
+
+        /* Cards */
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .card {
+            background: var(--glass-bg);
+            border-radius: 16px;
+            border: 1px solid var(--glass-border);
+            padding: 24px;
+            backdrop-filter: blur(10px);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .card:hover { box-shadow: var(--shadow-glow); }
+
+        .card-title {
+            font-size: 0.85rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--accent-teal);
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .card-title::before {
+            content: '';
+            width: 4px;
+            height: 16px;
+            background: linear-gradient(to bottom, var(--accent-teal), var(--accent-purple));
+            border-radius: 2px;
+        }
+
+        .full-width { grid-column: 1 / -1; }
+
+        /* Problem */
+        .problem-body {
+            color: var(--text-secondary);
+            line-height: 1.7;
+            font-size: 0.9rem;
+        }
+        .problem-body code {
+            background: var(--bg-primary);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.82rem;
+            color: var(--accent-teal);
+        }
+        .problem-body .example {
+            background: var(--bg-primary);
+            border: 1px solid var(--glass-border);
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin: 10px 0;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.82rem;
+            color: var(--text-secondary);
+            white-space: pre-line;
+        }
+
+        .complexity-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 12px;
+        }
+
+        .complexity-box {
+            padding: 12px;
+            background: var(--bg-primary);
+            border-radius: 10px;
+            border: 1px solid var(--glass-border);
+            text-align: center;
+        }
+
+        .complexity-box .ctype {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+
+        .complexity-box .cval {
+            font-size: 1.1rem;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .complexity-box .naive { color: var(--accent-red); }
+        .complexity-box .optimal { color: var(--accent-green); }
+
+        /* Timeline Canvas */
+        .timeline-wrapper {
+            position: relative;
+            width: 100%;
+            height: 500px;
+            background: linear-gradient(to bottom, #0a0a1a, var(--bg-primary));
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid var(--glass-border);
+        }
+
+        #timeline-canvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Phase indicator */
+        .phase-bar {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 16px;
+        }
+
+        .phase-item {
+            flex: 1;
+            padding: 8px 12px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            text-align: center;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            transition: all 0.3s;
+        }
+
+        .phase-item.active {
+            background: linear-gradient(135deg, rgba(100, 255, 218, 0.15), rgba(179, 136, 255, 0.1));
+            color: var(--accent-teal);
+            border-color: var(--accent-teal);
+            box-shadow: 0 0 12px rgba(100, 255, 218, 0.15);
+        }
+
+        .phase-item.done {
+            color: var(--accent-green);
+            border-color: rgba(105, 240, 174, 0.3);
+        }
+
+        /* Controls */
+        .controls-bar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 16px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 10px;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-teal), #00bfa5);
+            color: #0f0f1a;
+            box-shadow: 0 4px 15px rgba(100, 255, 218, 0.3);
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(100, 255, 218, 0.4);
+        }
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: var(--bg-card);
+            color: var(--text-secondary);
+            border: 1px solid var(--border-color);
+        }
+        .btn-secondary:hover {
+            background: var(--bg-card-hover);
+            color: var(--text-primary);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, var(--accent-green), #00c853);
+            color: #0f0f1a;
+            box-shadow: 0 4px 15px rgba(105, 240, 174, 0.3);
+        }
+        .btn-success:hover {
+            transform: translateY(-2px);
+        }
+
+        .speed-control {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-left: auto;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+        }
+
+        .speed-control input[type="range"] {
+            width: 100px;
+            accent-color: var(--accent-purple);
+        }
+
+        /* Input groups */
+        .input-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .input-group label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            min-width: 80px;
+        }
+
+        .input-group input, .input-group select {
+            flex: 1;
+            padding: 8px 12px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+        }
+        .input-group input:focus, .input-group select:focus {
+            outline: none;
+            border-color: var(--accent-teal);
+            box-shadow: 0 0 0 3px rgba(100, 255, 218, 0.15);
+        }
+
+        /* Result display */
+        .result-display {
+            padding: 16px;
+            background: var(--bg-primary);
+            border-radius: 12px;
+            border: 1px solid var(--glass-border);
+            text-align: center;
+            margin-top: 12px;
+            min-height: 60px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .result-display .result-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+
+        .result-display .result-value {
+            font-size: 2rem;
+            font-weight: 800;
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--accent-teal);
+        }
+
+        /* Log */
+        .log-panel {
+            max-height: 200px;
+            overflow-y: auto;
+            padding: 10px;
+            background: var(--bg-primary);
+            border-radius: 10px;
+            border: 1px solid var(--glass-border);
+        }
+
+        .log-entry {
+            padding: 6px 10px;
+            font-size: 0.8rem;
+            border-left: 3px solid var(--accent-teal);
+            margin-bottom: 6px;
+            opacity: 0;
+            animation: fadeIn 0.3s ease forwards;
+            color: var(--text-secondary);
+        }
+
+        .log-entry.sort { border-left-color: var(--accent-purple); }
+        .log-entry.scan { border-left-color: var(--accent-yellow); }
+        .log-entry.choose { border-left-color: var(--accent-teal); }
+        .log-entry.gap { border-left-color: var(--accent-red); }
+        .log-entry.done { border-left-color: var(--accent-green); }
+        .log-entry.init { border-left-color: var(--accent-blue); }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Code panel */
+        .code-panel {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.78rem;
+            line-height: 1.7;
+            overflow-x: auto;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .code-line {
+            padding: 2px 12px;
+            white-space: pre;
+            border-left: 3px solid transparent;
+            transition: all 0.3s;
+            border-radius: 0 4px 4px 0;
+        }
+
+        .code-line.active {
+            background: rgba(100, 255, 218, 0.1);
+            border-left-color: var(--accent-teal);
+        }
+
+        .code-line .keyword { color: var(--accent-purple); }
+        .code-line .function { color: var(--accent-teal); }
+        .code-line .number { color: var(--accent-orange); }
+        .code-line .comment { color: var(--text-muted); font-style: italic; }
+        .code-line .line-num {
+            color: var(--text-muted);
+            margin-right: 16px;
+            user-select: none;
+            display: inline-block;
+            width: 24px;
+            text-align: right;
+        }
+
+        /* Gospel */
+        .gospel-card {
+            background: linear-gradient(135deg, rgba(179, 136, 255, 0.08), rgba(100, 255, 218, 0.05));
+            border: 1px solid rgba(179, 136, 255, 0.2);
+        }
+
+        .gospel-card .card-title::before {
+            background: linear-gradient(to bottom, var(--accent-purple), var(--accent-yellow));
+        }
+
+        .gospel-card blockquote {
+            border-left: 3px solid var(--accent-purple);
+            padding: 12px 16px;
+            margin: 12px 0;
+            background: rgba(179, 136, 255, 0.05);
+            border-radius: 0 8px 8px 0;
+            font-style: italic;
+            color: var(--text-secondary);
+            line-height: 1.7;
+        }
+
+        .gospel-card .scripture-ref {
+            color: var(--accent-purple);
+            font-weight: 600;
+            font-style: normal;
+        }
+
+        .gospel-body {
+            color: var(--text-secondary);
+            line-height: 1.7;
+            font-size: 0.95rem;
+        }
+
+        .gospel-body strong {
+            color: var(--accent-yellow);
+        }
+
+        /* Responsive */
+        @media (max-width: 900px) {
+            .main-grid { grid-template-columns: 1fr; }
+            .full-width { grid-column: 1; }
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg-primary); }
+        ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="badge">LeetCode 1024 · Medium</div>
+            <h1>🎬 Video Stitching</h1>
+            <p>Given a set of video clips, find the minimum number needed to cover the entire event. Watch the greedy algorithm select optimal clips in real-time!</p>
+        </header>
+
+        <div class="main-grid">
+            <!-- Problem Statement -->
+            <div class="card full-width">
+                <div class="card-title">Problem Statement</div>
+                <div class="problem-body">
+                    You are given a series of video clips from a sporting event that lasted <code>time</code> seconds. Each clip <code>clips[i] = [start_i, end_i]</code> covers the interval <code>[start_i, end_i]</code>. Clips can overlap and be cut freely.
+
+                    <br><br>Return the <strong>minimum number of clips</strong> needed to cover the entire event <code>[0, time]</code>. If impossible, return <code>-1</code>.
+
+                    <div class="complexity-grid">
+                        <div class="complexity-box">
+                            <div class="ctype">Brute Force</div>
+                            <div class="cval naive">O(2ⁿ) subsets</div>
+                        </div>
+                        <div class="complexity-box">
+                            <div class="ctype">Greedy (Sort + Scan)</div>
+                            <div class="cval optimal">O(n log n)</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Timeline Visualization -->
+            <div class="card full-width">
+                <div class="card-title">Timeline Visualization</div>
+
+                <div class="phase-bar">
+                    <div class="phase-item active" id="phase-initial">① Unsorted Clips</div>
+                    <div class="phase-item" id="phase-sort">② Sort</div>
+                    <div class="phase-item" id="phase-greedy">③ Greedy Scan</div>
+                    <div class="phase-item" id="phase-result">④ Result</div>
+                </div>
+
+                <div class="timeline-wrapper">
+                    <canvas id="timeline-canvas"></canvas>
+                </div>
+
+                <div class="result-display" id="result-display">
+                    <div class="result-label">Minimum Clips</div>
+                    <div class="result-value" id="result-value">—</div>
+                </div>
+
+                <div class="controls-bar">
+                    <button class="btn btn-secondary" id="btn-reset" onclick="resetSimulation()">⟲ Reset</button>
+                    <button class="btn btn-primary" id="btn-step" onclick="stepForward()">Step Forward →</button>
+                    <button class="btn btn-success" id="btn-auto" onclick="toggleAutoPlay()">▶ Auto Play</button>
+                    <div class="speed-control">
+                        <label for="speed">Speed:</label>
+                        <input type="range" id="speed" min="1" max="10" value="5">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Config Panel -->
+            <div class="card">
+                <div class="card-title">Configuration</div>
+                <div class="input-group">
+                    <label>Clips:</label>
+                    <input type="text" id="input-clips" value="[0,2],[4,6],[8,10],[1,9],[1,5],[5,9]" placeholder="[s,e],[s,e],...">
+                </div>
+                <div class="input-group">
+                    <label>Time:</label>
+                    <input type="number" id="input-time" value="10" min="1" max="100">
+                </div>
+                <div class="input-group">
+                    <label>Preset:</label>
+                    <select id="preset-select" onchange="loadPreset()">
+                        <option value="">Custom</option>
+                        <option value="1" selected>Ex 1: cover [0,10] — 3 clips</option>
+                        <option value="2">Ex 2: impossible gap — returns -1</option>
+                        <option value="3">Ex 3: two overlapping — 2 clips</option>
+                        <option value="4">Ex 4: many clips [0,9] — 3 clips</option>
+                    </select>
+                </div>
+                <button class="btn btn-primary" style="width:100%; justify-content:center; margin-top:8px;" onclick="applyConfig()">Apply & Reset</button>
+            </div>
+
+            <!-- Algorithm Explanation -->
+            <div class="card">
+                <div class="card-title">Algorithm Strategy</div>
+                <div class="problem-body">
+                    <strong style="color: var(--accent-teal);">1. Sort</strong> clips by start time (ascending), breaking ties by end time (descending — longest reach first).<br><br>
+                    <strong style="color: var(--accent-yellow);">2. Greedy Scan</strong> — maintain a cursor at the current coverage end. For all clips that start ≤ cursor, find the one that extends farthest.<br><br>
+                    <strong style="color: var(--accent-green);">3. Choose</strong> that clip, advance the cursor, increment the count. Repeat.<br><br>
+                    <strong style="color: var(--accent-red);">4. Gap?</strong> If no clip can reach from the cursor, it's impossible → return <code>-1</code>.
+                </div>
+            </div>
+
+            <!-- Code -->
+            <div class="card full-width">
+                <div class="card-title">Python Solution</div>
+                <div class="code-panel" id="code-panel"></div>
+            </div>
+
+            <!-- Log -->
+            <div class="card full-width">
+                <div class="card-title">Step-by-Step Log</div>
+                <div class="log-panel" id="log-panel"></div>
+                <div style="margin-top:8px;">
+                    <button class="btn btn-secondary" onclick="clearLog()">Clear Log</button>
+                </div>
+            </div>
+
+            <!-- Gospel Connection -->
+            <div class="card gospel-card full-width">
+                <div class="card-title">💡 Gospel Connection — Covering the Whole with Many Parts</div>
+                <div class="gospel-body">
+                    <p>In Video Stitching, <strong>no single clip may cover the entire event</strong> — but by carefully selecting and combining overlapping segments, we can achieve complete coverage. Each clip is valuable not for what it covers alone, but for <strong>how it connects to others</strong>.</p>
+
+                    <blockquote>
+                        "For the body is not one member, but many... And the eye cannot say unto the hand, I have no need of thee: nor again the head to the feet, I have no need of you."
+                        <br><span class="scripture-ref">— 1 Corinthians 12:14, 21</span>
+                    </blockquote>
+
+                    <p>The greedy insight teaches that <strong>wise selection matters</strong>. At each step we don't just pick any clip — we pick the one that <strong>reaches farthest</strong>. Similarly, we are counseled to make the most of every opportunity: "See then that ye walk circumspectly, not as fools, but as wise, <strong>redeeming the time</strong>" (Ephesians 5:15–16). When each member contributes their best reach, the whole body of Christ is covered.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // ==============================
+    // Python code for display
+    // ==============================
+    const CODE_LINES = [
+        'def videoStitching(clips, time):',
+        '    clips.sort(key=lambda c: (c[0], -c[1]))',
+        '    count = 0',
+        '    cur_end = 0',
+        '    farthest = 0',
+        '    i = 0',
+        '',
+        '    while cur_end < time:',
+        '        # Find clip starting <= cur_end with farthest reach',
+        '        while i < len(clips) and clips[i][0] <= cur_end:',
+        '            farthest = max(farthest, clips[i][1])',
+        '            i += 1',
+        '',
+        '        if farthest == cur_end:  # no progress, gap!',
+        '            return -1',
+        '',
+        '        cur_end = farthest  # advance coverage',
+        '        count += 1',
+        '',
+        '    return count',
+    ];
+
+    // ==============================
+    // State
+    // ==============================
+    let clips = [[0,2],[4,6],[8,10],[1,9],[1,5],[5,9]];
+    let targetTime = 10;
+
+    // Display clips: each has {start, end, origIdx, state, displayRow}
+    let displayClips = [];
+    let sortedClips = [];
+
+    // Animation phases: 'initial', 'sorting', 'sorted', 'scanning', 'choosing', 'advance', 'done', 'gap'
+    let phase = 'initial';
+    let cursorPos = 0;        // current coverage end
+    let farthestPos = 0;      // farthest reachable
+    let scanIdx = 0;          // current clip being scanned
+    let bestScanIdx = -1;     // best clip found so far in current scan
+    let chosenClips = [];     // indices (in sortedClips) that are chosen
+    let clipCount = 0;
+    let simulationDone = false;
+    let autoPlaying = false;
+    let autoTimer = null;
+
+    // Sort animation
+    let sortAnimProgress = 0; // 0 to 1
+    let preSortPositions = [];
+    let postSortPositions = [];
+    let isSortAnimating = false;
+
+    // ==============================
+    // Presets
+    // ==============================
+    const PRESETS = {
+        '1': { clips: [[0,2],[4,6],[8,10],[1,9],[1,5],[5,9]], time: 10 },
+        '2': { clips: [[0,1],[1,2]], time: 5 },
+        '3': { clips: [[0,4],[2,8]], time: 5 },
+        '4': { clips: [[0,1],[6,8],[0,2],[5,6],[0,4],[0,3],[6,7],[1,3],[4,7],[1,4],[2,5],[2,6],[3,4],[4,5],[5,7],[6,9]], time: 9 },
+    };
+
+    function loadPreset() {
+        const sel = document.getElementById('preset-select').value;
+        if (PRESETS[sel]) {
+            const p = PRESETS[sel];
+            document.getElementById('input-clips').value = p.clips.map(c => `[${c[0]},${c[1]}]`).join(',');
+            document.getElementById('input-time').value = p.time;
+        }
+    }
+
+    function applyConfig() {
+        try {
+            const raw = document.getElementById('input-clips').value;
+            const parsed = [];
+            const re = /\[(\d+)\s*,\s*(\d+)\]/g;
+            let m;
+            while ((m = re.exec(raw)) !== null) {
+                parsed.push([parseInt(m[1]), parseInt(m[2])]);
+            }
+            if (parsed.length === 0) return;
+            clips = parsed;
+            targetTime = parseInt(document.getElementById('input-time').value) || 10;
+        } catch(e) { return; }
+        resetSimulation();
+    }
+
+    // ==============================
+    // Initialization
+    // ==============================
+    function initClips() {
+        displayClips = clips.map((c, i) => ({
+            start: c[0],
+            end: c[1],
+            origIdx: i,
+            state: 'default', // 'default', 'scanning', 'best-so-far', 'chosen', 'skipped'
+            row: i,
+        }));
+        sortedClips = [...displayClips];
+    }
+
+    function resetSimulation() {
+        if (autoTimer) clearInterval(autoTimer);
+        autoPlaying = false;
+        document.getElementById('btn-auto').textContent = '▶ Auto Play';
+        document.getElementById('btn-step').disabled = false;
+
+        initClips();
+        phase = 'initial';
+        cursorPos = 0;
+        farthestPos = 0;
+        scanIdx = 0;
+        bestScanIdx = -1;
+        chosenClips = [];
+        clipCount = 0;
+        simulationDone = false;
+        sortAnimProgress = 0;
+        isSortAnimating = false;
+
+        document.getElementById('log-panel').innerHTML = '';
+        document.getElementById('result-value').textContent = '—';
+        document.getElementById('result-value').style.color = 'var(--accent-teal)';
+
+        updatePhaseIndicator();
+        drawTimeline();
+        addLog(`Initialized: ${clips.length} clips, target time = ${targetTime}`, 'init');
+    }
+
+    // ==============================
+    // Phase indicator
+    // ==============================
+    function updatePhaseIndicator() {
+        const phases = ['initial', 'sort', 'greedy', 'result'];
+        const phaseMap = {
+            'initial': 0,
+            'sorting': 1, 'sorted': 1,
+            'scanning': 2, 'choosing': 2, 'advance': 2,
+            'done': 3, 'gap': 3,
+        };
+        const currentPhaseIdx = phaseMap[phase] || 0;
+
+        phases.forEach((p, i) => {
+            const el = document.getElementById('phase-' + p);
+            el.classList.remove('active', 'done');
+            if (i < currentPhaseIdx) el.classList.add('done');
+            else if (i === currentPhaseIdx) el.classList.add('active');
+        });
+    }
+
+    // ==============================
+    // Step forward
+    // ==============================
+    function stepForward() {
+        if (simulationDone) return;
+
+        switch (phase) {
+            case 'initial':
+                startSort();
+                break;
+            case 'sorted':
+                startGreedy();
+                break;
+            case 'scanning':
+                doScanStep();
+                break;
+            case 'choosing':
+                doChooseStep();
+                break;
+            case 'advance':
+                doAdvanceStep();
+                break;
+        }
+
+        updatePhaseIndicator();
+        drawTimeline();
+    }
+
+    // --- Sort phase ---
+    function startSort() {
+        phase = 'sorting';
+        highlightCode(1); // clips.sort(...)
+        addLog('Sorting clips by start (asc), then end (desc)...', 'sort');
+
+        // Record pre-sort row positions
+        preSortPositions = sortedClips.map(c => c.row);
+
+        // Sort
+        sortedClips.sort((a, b) => {
+            if (a.start !== b.start) return a.start - b.start;
+            return b.end - a.end; // desc by end
+        });
+
+        // Assign new rows
+        sortedClips.forEach((c, i) => c.row = i);
+        postSortPositions = sortedClips.map(c => c.row);
+
+        // Animate sort
+        isSortAnimating = true;
+        sortAnimProgress = 0;
+        const startTime = performance.now();
+        const duration = 800;
+
+        function animateSort(now) {
+            sortAnimProgress = Math.min(1, (now - startTime) / duration);
+            // Ease out
+            sortAnimProgress = 1 - Math.pow(1 - sortAnimProgress, 3);
+            drawTimeline();
+            if (sortAnimProgress < 1) {
+                requestAnimationFrame(animateSort);
+            } else {
+                isSortAnimating = false;
+                phase = 'sorted';
+                addLog(`Sorted: [${sortedClips.map(c => `[${c.start},${c.end}]`).join(', ')}]`, 'sort');
+                updatePhaseIndicator();
+                drawTimeline();
+            }
+        }
+        requestAnimationFrame(animateSort);
+    }
+
+    // --- Greedy phase ---
+    function startGreedy() {
+        phase = 'scanning';
+        cursorPos = 0;
+        farthestPos = 0;
+        scanIdx = 0;
+        bestScanIdx = -1;
+        clipCount = 0;
+        chosenClips = [];
+
+        // Reset all clip states
+        sortedClips.forEach(c => c.state = 'default');
+
+        highlightCode(7); // while cur_end < time
+        addLog(`Starting greedy scan. Cursor at 0, need to reach ${targetTime}.`, 'scan');
+        drawTimeline();
+    }
+
+    function doScanStep() {
+        if (scanIdx < sortedClips.length && sortedClips[scanIdx].start <= cursorPos) {
+            const clip = sortedClips[scanIdx];
+
+            // Reset previous best-so-far to scanning (unless chosen)
+            if (bestScanIdx >= 0 && sortedClips[bestScanIdx].state === 'best-so-far') {
+                sortedClips[bestScanIdx].state = 'scanning';
+            }
+
+            clip.state = 'scanning';
+            highlightCode(10); // farthest = max(...)
+
+            if (clip.end > farthestPos) {
+                farthestPos = clip.end;
+                bestScanIdx = scanIdx;
+                clip.state = 'best-so-far';
+                addLog(`  Scan clip [${clip.start},${clip.end}]: extends to ${clip.end} ★ new best!`, 'scan');
+            } else {
+                addLog(`  Scan clip [${clip.start},${clip.end}]: reaches ${clip.end}, not better than ${farthestPos}`, 'scan');
+            }
+
+            scanIdx++;
+            drawTimeline();
+        } else {
+            // Done scanning this batch — move to choosing
+            if (farthestPos === cursorPos) {
+                // GAP!
+                phase = 'gap';
+                simulationDone = true;
+                highlightCode(14); // return -1
+                addLog(`✗ No clip can extend past ${cursorPos}. GAP detected! Impossible.`, 'gap');
+
+                document.getElementById('result-value').textContent = '-1';
+                document.getElementById('result-value').style.color = 'var(--accent-red)';
+                document.getElementById('btn-step').disabled = true;
+                stopAutoPlay();
+                updatePhaseIndicator();
+                drawTimeline();
+            } else {
+                phase = 'choosing';
+                highlightCode(16); // cur_end = farthest
+                drawTimeline();
+            }
+        }
+    }
+
+    function doChooseStep() {
+        // Mark the best clip as chosen
+        if (bestScanIdx >= 0) {
+            // Mark scanned but not chosen clips as skipped
+            for (let i = 0; i < scanIdx; i++) {
+                if (sortedClips[i].state === 'scanning' || sortedClips[i].state === 'best-so-far') {
+                    if (i === bestScanIdx) {
+                        sortedClips[i].state = 'chosen';
+                    } else {
+                        sortedClips[i].state = 'skipped';
+                    }
+                }
+            }
+            chosenClips.push(bestScanIdx);
+            clipCount++;
+            const clip = sortedClips[bestScanIdx];
+            addLog(`✓ Choose clip [${clip.start},${clip.end}]! Coverage extends to ${farthestPos}. Count = ${clipCount}`, 'choose');
+        }
+
+        highlightCode(17); // count += 1
+        phase = 'advance';
+        drawTimeline();
+    }
+
+    function doAdvanceStep() {
+        cursorPos = farthestPos;
+        addLog(`Cursor advances to ${cursorPos}.`, 'choose');
+
+        if (cursorPos >= targetTime) {
+            // DONE!
+            phase = 'done';
+            simulationDone = true;
+            highlightCode(19); // return count
+            addLog(`🎉 Coverage complete! [0, ${targetTime}] covered with ${clipCount} clip(s).`, 'done');
+
+            document.getElementById('result-value').textContent = clipCount;
+            document.getElementById('result-value').style.color = 'var(--accent-green)';
+            document.getElementById('btn-step').disabled = true;
+            stopAutoPlay();
+            updatePhaseIndicator();
+        } else {
+            // Reset for next scan batch
+            bestScanIdx = -1;
+            farthestPos = cursorPos;
+            phase = 'scanning';
+            highlightCode(9); // inner while
+            addLog(`Scanning clips starting at or before ${cursorPos}...`, 'scan');
+        }
+
+        drawTimeline();
+    }
+
+    // ==============================
+    // Auto play
+    // ==============================
+    function toggleAutoPlay() {
+        if (autoPlaying) {
+            stopAutoPlay();
+        } else {
+            autoPlaying = true;
+            document.getElementById('btn-auto').textContent = '⏸ Pause';
+            const speed = document.getElementById('speed').value;
+            const ms = 1200 - (speed * 100);
+            autoTimer = setInterval(() => {
+                if (simulationDone || isSortAnimating) {
+                    if (simulationDone) stopAutoPlay();
+                    return;
+                }
+                stepForward();
+            }, ms);
+        }
+    }
+
+    function stopAutoPlay() {
+        if (autoTimer) clearInterval(autoTimer);
+        autoPlaying = false;
+        document.getElementById('btn-auto').textContent = '▶ Auto Play';
+    }
+
+    // ==============================
+    // Drawing
+    // ==============================
+    function drawTimeline() {
+        const canvas = document.getElementById('timeline-canvas');
+        const ctx = canvas.getContext('2d');
+        const rect = canvas.parentElement.getBoundingClientRect();
+        canvas.width = rect.width * 2;
+        canvas.height = rect.height * 2;
+        ctx.scale(2, 2);
+        const W = rect.width;
+        const H = rect.height;
+        ctx.clearRect(0, 0, W, H);
+
+        const n = sortedClips.length;
+        if (n === 0) return;
+
+        // Layout
+        const padLeft = 60;
+        const padRight = 40;
+        const padTop = 30;
+        const padBottom = 50;
+        const timelineW = W - padLeft - padRight;
+        const timelineH = H - padTop - padBottom;
+
+        const maxTime = Math.max(targetTime, ...sortedClips.map(c => c.end));
+        const timeScale = timelineW / maxTime;
+        const barHeight = Math.min(24, Math.max(12, (timelineH - 20) / n - 4));
+        const rowGap = Math.min(barHeight + 8, (timelineH) / n);
+
+        // --- Draw target zone ---
+        const targetX = padLeft + targetTime * timeScale;
+        ctx.fillStyle = 'rgba(100, 255, 218, 0.03)';
+        ctx.fillRect(padLeft, padTop, targetTime * timeScale, timelineH);
+        ctx.strokeStyle = 'rgba(100, 255, 218, 0.3)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 4]);
+        ctx.beginPath();
+        ctx.moveTo(targetX, padTop);
+        ctx.lineTo(targetX, padTop + timelineH);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Target label
+        ctx.fillStyle = 'rgba(100, 255, 218, 0.6)';
+        ctx.font = 'bold 11px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(`T = ${targetTime}`, targetX, padTop - 8);
+
+        // --- Draw time axis ---
+        ctx.strokeStyle = 'rgba(92, 107, 192, 0.4)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(padLeft, padTop + timelineH);
+        ctx.lineTo(padLeft + timelineW, padTop + timelineH);
+        ctx.stroke();
+
+        // Tick marks
+        for (let t = 0; t <= maxTime; t++) {
+            const x = padLeft + t * timeScale;
+            const isMajor = t % 5 === 0 || maxTime <= 12;
+            ctx.strokeStyle = isMajor ? 'rgba(92, 107, 192, 0.5)' : 'rgba(92, 107, 192, 0.2)';
+            ctx.beginPath();
+            ctx.moveTo(x, padTop + timelineH);
+            ctx.lineTo(x, padTop + timelineH + (isMajor ? 8 : 4));
+            ctx.stroke();
+
+            if (isMajor) {
+                ctx.fillStyle = '#5c6bc0';
+                ctx.font = '10px JetBrains Mono, monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText(t, x, padTop + timelineH + 20);
+            }
+        }
+
+        // --- Draw cursor line ---
+        if (phase === 'scanning' || phase === 'choosing' || phase === 'advance' || phase === 'done' || phase === 'gap') {
+            const cx = padLeft + cursorPos * timeScale;
+            ctx.save();
+            ctx.shadowColor = '#64ffda';
+            ctx.shadowBlur = 10;
+            ctx.strokeStyle = 'rgba(100, 255, 218, 0.8)';
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            ctx.moveTo(cx, padTop);
+            ctx.lineTo(cx, padTop + timelineH);
+            ctx.stroke();
+            ctx.restore();
+
+            // Cursor label
+            ctx.fillStyle = '#64ffda';
+            ctx.font = 'bold 10px JetBrains Mono, monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText(`cur=${cursorPos}`, cx, padTop + timelineH + 35);
+
+            // Draw farthest line if scanning and different from cursor
+            if (farthestPos > cursorPos && (phase === 'scanning' || phase === 'choosing')) {
+                const fx = padLeft + farthestPos * timeScale;
+                ctx.strokeStyle = 'rgba(255, 215, 64, 0.5)';
+                ctx.lineWidth = 1.5;
+                ctx.setLineDash([4, 4]);
+                ctx.beginPath();
+                ctx.moveTo(fx, padTop);
+                ctx.lineTo(fx, padTop + timelineH);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                ctx.fillStyle = 'rgba(255, 215, 64, 0.8)';
+                ctx.font = '9px JetBrains Mono, monospace';
+                ctx.fillText(`far=${farthestPos}`, fx, padTop - 8);
+            }
+        }
+
+        // --- Draw gap indicator ---
+        if (phase === 'gap') {
+            const cx = padLeft + cursorPos * timeScale;
+            ctx.save();
+            ctx.shadowColor = '#ff5252';
+            ctx.shadowBlur = 20;
+            ctx.strokeStyle = 'rgba(255, 82, 82, 0.9)';
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.moveTo(cx, padTop);
+            ctx.lineTo(cx, padTop + timelineH);
+            ctx.stroke();
+            ctx.restore();
+
+            ctx.fillStyle = '#ff5252';
+            ctx.font = 'bold 13px Inter, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('GAP!', cx, padTop + timelineH / 2 - 20);
+            ctx.font = '11px Inter, sans-serif';
+            ctx.fillText('Cannot cover', cx, padTop + timelineH / 2);
+        }
+
+        // --- Draw clip bars ---
+        sortedClips.forEach((clip, i) => {
+            let row;
+            if (isSortAnimating) {
+                // Interpolate between pre-sort and post-sort positions
+                const origRow = preSortPositions[displayClips.indexOf(clip)] || i;
+                const newRow = i;
+                // Find original index in the pre-sort array
+                let preIdx = 0;
+                for (let j = 0; j < displayClips.length; j++) {
+                    if (displayClips[j] === clip) { preIdx = j; break; }
+                }
+                row = preIdx + (i - preIdx) * sortAnimProgress;
+            } else {
+                row = i;
+            }
+
+            const y = padTop + row * rowGap + (rowGap - barHeight) / 2;
+            const x1 = padLeft + clip.start * timeScale;
+            const x2 = padLeft + clip.end * timeScale;
+            const barW = Math.max(x2 - x1, 2);
+
+            // Determine colors based on state
+            let fillColor, borderColor, glowColor = null, labelColor;
+            switch (clip.state) {
+                case 'scanning':
+                    fillColor = 'rgba(255, 171, 64, 0.3)';
+                    borderColor = 'rgba(255, 171, 64, 0.8)';
+                    labelColor = '#ffab40';
+                    break;
+                case 'best-so-far':
+                    fillColor = 'rgba(255, 215, 64, 0.4)';
+                    borderColor = 'rgba(255, 215, 64, 0.9)';
+                    glowColor = '#ffd740';
+                    labelColor = '#ffd740';
+                    break;
+                case 'chosen':
+                    fillColor = 'rgba(100, 255, 218, 0.35)';
+                    borderColor = 'rgba(100, 255, 218, 0.9)';
+                    glowColor = '#64ffda';
+                    labelColor = '#64ffda';
+                    break;
+                case 'skipped':
+                    fillColor = 'rgba(92, 107, 192, 0.1)';
+                    borderColor = 'rgba(92, 107, 192, 0.25)';
+                    labelColor = 'rgba(92, 107, 192, 0.5)';
+                    break;
+                default: // 'default'
+                    fillColor = 'rgba(79, 195, 247, 0.15)';
+                    borderColor = 'rgba(79, 195, 247, 0.5)';
+                    labelColor = 'rgba(79, 195, 247, 0.8)';
+            }
+
+            // Glow
+            if (glowColor) {
+                ctx.save();
+                ctx.shadowColor = glowColor;
+                ctx.shadowBlur = 12;
+            }
+
+            // Bar fill
+            ctx.fillStyle = fillColor;
+            ctx.beginPath();
+            ctx.roundRect(x1, y, barW, barHeight, 4);
+            ctx.fill();
+
+            // Bar border
+            ctx.strokeStyle = borderColor;
+            ctx.lineWidth = clip.state === 'chosen' ? 2.5 : 1.5;
+            ctx.beginPath();
+            ctx.roundRect(x1, y, barW, barHeight, 4);
+            ctx.stroke();
+
+            if (glowColor) {
+                ctx.restore();
+            }
+
+            // Label: [start, end]
+            ctx.fillStyle = labelColor;
+            ctx.font = `${Math.min(11, barHeight * 0.6)}px JetBrains Mono, monospace`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            const label = `[${clip.start},${clip.end}]`;
+            const labelW = ctx.measureText(label).width;
+            if (barW > labelW + 8) {
+                ctx.fillText(label, x1 + barW / 2, y + barHeight / 2);
+            } else {
+                // Draw label to the right
+                ctx.textAlign = 'left';
+                ctx.fillText(label, x2 + 6, y + barHeight / 2);
+            }
+
+            // Clip index label on the left
+            ctx.fillStyle = 'rgba(92, 107, 192, 0.5)';
+            ctx.font = '9px JetBrains Mono, monospace';
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(`#${clip.origIdx}`, padLeft - 8, y + barHeight / 2);
+        });
+
+        // --- Title ---
+        ctx.fillStyle = '#5c6bc0';
+        ctx.font = 'bold 11px Inter, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        let titleText = '';
+        switch (phase) {
+            case 'initial': titleText = 'Clips in original order'; break;
+            case 'sorting': titleText = 'Sorting clips...'; break;
+            case 'sorted': titleText = 'Clips sorted — ready to scan'; break;
+            case 'scanning': titleText = 'Scanning reachable clips'; break;
+            case 'choosing': titleText = 'Choosing best clip'; break;
+            case 'advance': titleText = 'Advancing cursor'; break;
+            case 'done': titleText = `✓ Complete! ${clipCount} clip(s) needed`; break;
+            case 'gap': titleText = '✗ Impossible — gap detected!'; break;
+        }
+        ctx.fillText(titleText, padLeft, 10);
+    }
+
+    // ==============================
+    // Code panel
+    // ==============================
+    function escapeHtml(str) {
+        return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function initCodePanel() {
+        const panel = document.getElementById('code-panel');
+        panel.innerHTML = '';
+        CODE_LINES.forEach((text, i) => {
+            const div = document.createElement('div');
+            div.className = 'code-line';
+            let html = `<span class="line-num">${i + 1}</span>`;
+
+            const commentIdx = text.indexOf('#');
+            let codePart = commentIdx >= 0 ? text.substring(0, commentIdx) : text;
+            let commentPart = commentIdx >= 0 ? text.substring(commentIdx) : '';
+
+            let processed = escapeHtml(codePart)
+                .replace(/\b(def|for|in|if|while|return|and|or|not)\b/g, '<span class="keyword">$1</span>')
+                .replace(/\b(len|max|sort|lambda)\b/g, '<span class="function">$1</span>')
+                .replace(/\b(\d+)\b/g, '<span class="number">$1</span>');
+
+            if (commentPart) {
+                processed += '<span class="comment">' + escapeHtml(commentPart) + '</span>';
+            }
+
+            html += processed;
+            div.innerHTML = html;
+            panel.appendChild(div);
+        });
+    }
+
+    function highlightCode(lineIdx) {
+        document.querySelectorAll('#code-panel .code-line').forEach((el, i) => {
+            el.classList.toggle('active', i === lineIdx);
+        });
+    }
+
+    // ==============================
+    // Log
+    // ==============================
+    function addLog(msg, cls = '') {
+        const panel = document.getElementById('log-panel');
+        const entry = document.createElement('div');
+        entry.className = 'log-entry ' + cls;
+        entry.textContent = msg;
+        panel.appendChild(entry);
+        panel.scrollTop = panel.scrollHeight;
+    }
+
+    function clearLog() {
+        document.getElementById('log-panel').innerHTML = '';
+    }
+
+    // ==============================
+    // Init
+    // ==============================
+    window.addEventListener('load', () => {
+        initCodePanel();
+        resetSimulation();
+    });
+
+    window.addEventListener('resize', () => {
+        drawTimeline();
+    });
+    </script>
+</body>
+</html>
