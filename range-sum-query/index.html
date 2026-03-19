@@ -732,8 +732,9 @@
                     <div class="tree-canvas-wrapper tall">
                         <canvas id="segtree-canvas"></canvas>
                     </div>
-                    <div style="margin-top: 12px; display: flex; gap: 10px; align-items: center;">
-                        <button class="btn btn-purple" id="btn-build-anim" onclick="startBuildAnimation()">🎬 Build Tree</button>
+                    <div style="margin-top: 12px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                        <button class="btn btn-purple" id="btn-build-anim" onclick="startBuildAnimation()">🎬 Conceptual Build</button>
+                        <button class="btn btn-primary" id="btn-recursive-anim" onclick="startRecursiveBuildAnimation()">🔄 Recursive Build</button>
                         <span id="build-anim-status" style="font-size: 0.8rem; color: var(--text-muted);"></span>
                     </div>
                 </div>
@@ -1539,12 +1540,18 @@
     }
 
     function startBuildAnimation() {
+        // Stop recursive animation if running
+        if (recAnimState) {
+            if (recAnimRAF) cancelAnimationFrame(recAnimRAF);
+            recAnimState = null;
+            document.getElementById('btn-recursive-anim').textContent = '🔄 Recursive Build';
+        }
         if (buildAnimState) {
             // Stop current animation
             if (buildAnimRAF) cancelAnimationFrame(buildAnimRAF);
             buildAnimState = null;
             drawSegTree();
-            document.getElementById('btn-build-anim').textContent = '🎬 Build Tree';
+            document.getElementById('btn-build-anim').textContent = '🎬 Conceptual Build';
             document.getElementById('build-anim-status').textContent = '';
             return;
         }
@@ -1822,7 +1829,7 @@
             if (currentLevelIdx >= mergeLevels.length) {
                 buildAnimState = null;
                 if (buildAnimRAF) cancelAnimationFrame(buildAnimRAF);
-                document.getElementById('btn-build-anim').textContent = '🎬 Build Tree';
+                document.getElementById('btn-build-anim').textContent = '🎬 Conceptual Build';
                 document.getElementById('build-anim-status').textContent = '✅ Complete!';
                 setTimeout(() => {
                     document.getElementById('build-anim-status').textContent = '';
@@ -1896,6 +1903,734 @@
         ctx.moveTo(parent.x, parent.y + r);
         ctx.lineTo(rightChild.x, rightChild.y - r);
         ctx.stroke();
+    }
+
+    // ==============================
+    // Recursive DFS Build Animation
+    // ==============================
+    let recAnimState = null;
+    let recAnimRAF = null;
+
+    function generateDFSSteps(layout, n) {
+        // Generate the DFS traversal order matching CacheTree.__init__
+        // Each step: { type, nodeIdx, start, end, ... }
+        const steps = [];
+
+        function dfs(node, start, end) {
+            if (!layout.positions[node]) return;
+
+            // Step: create this node (unfilled)
+            steps.push({ type: 'create_node', nodeIdx: node, start, end });
+
+            if (start === end) {
+                // Leaf: fill with value
+                steps.push({ type: 'fill_leaf', nodeIdx: node, start, end, value: segTree[node] });
+            } else {
+                const mid = Math.floor((start + end) / 2);
+
+                // Recurse left
+                steps.push({ type: 'edge_down', fromNode: node, toNode: 2 * node, start, end, childStart: start, childEnd: mid });
+                dfs(2 * node, start, mid);
+                steps.push({ type: 'return_up', fromNode: 2 * node, toNode: node, value: segTree[2 * node] });
+
+                // Recurse right
+                steps.push({ type: 'edge_down', fromNode: node, toNode: 2 * node + 1, start, end, childStart: mid + 1, childEnd: end });
+                dfs(2 * node + 1, mid + 1, end);
+                steps.push({ type: 'return_up', fromNode: 2 * node + 1, toNode: node, value: segTree[2 * node + 1] });
+
+                // Fill parent with sum
+                steps.push({
+                    type: 'fill_parent', nodeIdx: node, start, end,
+                    leftVal: segTree[2 * node], rightVal: segTree[2 * node + 1],
+                    value: segTree[node]
+                });
+            }
+        }
+
+        dfs(1, 0, n - 1);
+        return steps;
+    }
+
+    function startRecursiveBuildAnimation() {
+        // Stop any running animation
+        if (buildAnimState) {
+            if (buildAnimRAF) cancelAnimationFrame(buildAnimRAF);
+            buildAnimState = null;
+            document.getElementById('btn-build-anim').textContent = '🎬 Conceptual Build';
+        }
+        if (recAnimState) {
+            if (recAnimRAF) cancelAnimationFrame(recAnimRAF);
+            recAnimState = null;
+            drawSegTree();
+            document.getElementById('btn-recursive-anim').textContent = '🔄 Recursive Build';
+            document.getElementById('build-anim-status').textContent = '';
+            return;
+        }
+
+        buildSegTree([...nums]);
+
+        const canvas = document.getElementById('segtree-canvas');
+        const rect = canvas.parentElement.getBoundingClientRect();
+        const W = rect.width;
+        const H = rect.height;
+        const n = nums.length;
+        const layout = getSegTreeLayout(W, H, n);
+
+        // Gather leaf positions for phase 1-2
+        const leafNodes = [];
+        for (const [nodeIdx, pos] of Object.entries(layout.positions)) {
+            if (pos.start === pos.end) {
+                leafNodes.push({ nodeIdx: parseInt(nodeIdx), ...pos });
+            }
+        }
+        leafNodes.sort((a, b) => a.start - b.start);
+
+        const boxW = Math.min(60, (W - 100) / n);
+        const boxH = boxW;
+        const totalBoxW = boxW * n;
+        const flatStartX = (W - totalBoxW) / 2;
+        const flatY = H / 2 - boxH / 2;
+        const flatPositions = leafNodes.map((leaf, i) => ({
+            x: flatStartX + i * boxW + boxW / 2,
+            y: flatY + boxH / 2,
+            w: boxW, h: boxH,
+        }));
+
+        const dfsSteps = generateDFSSteps(layout, n);
+
+        const PHASE1_DUR = 1000;
+        const PHASE2_DUR = 1200;
+        const STEP_DUR = 800;    // ms per DFS step
+
+        recAnimState = {
+            startTime: performance.now(),
+            layout, leafNodes, flatPositions, n, W, H,
+            PHASE1_DUR, PHASE2_DUR, STEP_DUR,
+            dfsSteps,
+            // Track which nodes are created and filled
+            createdNodes: new Set(),
+            filledNodes: new Map(), // nodeIdx -> { value, isLeaf }
+            drawnEdges: new Set(),  // "from-to" strings
+            // Current step animation state
+            activeStep: null,
+            activeStepT: 0,
+        };
+
+        document.getElementById('btn-recursive-anim').textContent = '⏹ Stop';
+        document.getElementById('build-anim-status').textContent = 'Phase 1: Array';
+        segHighlightNodes = [];
+        segQueryRangeNodes = [];
+        segTraversedEdges = [];
+
+        recAnimRAF = requestAnimationFrame(animateRecursiveFrame);
+    }
+
+    function animateRecursiveFrame(now) {
+        if (!recAnimState) return;
+        const s = recAnimState;
+        const elapsed = now - s.startTime;
+        const { layout, leafNodes, flatPositions, n } = s;
+        const { nodeRadius } = layout;
+
+        const canvas = document.getElementById('segtree-canvas');
+        const ctx = canvas.getContext('2d');
+        const rect = canvas.parentElement.getBoundingClientRect();
+        canvas.width = rect.width * 2;
+        canvas.height = rect.height * 2;
+        ctx.setTransform(2, 0, 0, 2, 0, 0);
+        const W = rect.width;
+        const H = rect.height;
+        ctx.clearRect(0, 0, W, H);
+
+        if (elapsed < s.PHASE1_DUR) {
+            // ====== PHASE 1: Flat array ======
+            document.getElementById('build-anim-status').textContent = 'Phase 1: Array';
+            const alpha = easeInOut(Math.min(1, elapsed / (s.PHASE1_DUR * 0.5)));
+            drawFlatArray(ctx, leafNodes, flatPositions, alpha);
+
+        } else if (elapsed < s.PHASE1_DUR + s.PHASE2_DUR) {
+            // ====== PHASE 2: Morph to ghost nodes ======
+            document.getElementById('build-anim-status').textContent = 'Phase 2: Creating ghost nodes';
+            const t = easeInOut(Math.min(1, (elapsed - s.PHASE1_DUR) / s.PHASE2_DUR));
+            drawMorphToGhosts(ctx, layout, leafNodes, flatPositions, nodeRadius, t, n);
+
+        } else {
+            // ====== PHASE 3: DFS recursive build ======
+            const phase3Elapsed = elapsed - s.PHASE1_DUR - s.PHASE2_DUR;
+            const currentStepIdx = Math.floor(phase3Elapsed / s.STEP_DUR);
+            const stepT = Math.min(1, (phase3Elapsed % s.STEP_DUR) / (s.STEP_DUR * 0.7));
+
+            // Process completed steps
+            for (let i = 0; i <= Math.min(currentStepIdx, s.dfsSteps.length - 1); i++) {
+                const step = s.dfsSteps[i];
+                if (i < currentStepIdx) {
+                    // Step fully completed — apply state
+                    applyStepState(s, step);
+                }
+            }
+
+            // Draw all ghost nodes first
+            drawAllGhostNodes(ctx, layout, nodeRadius, n);
+
+            // Draw completed edges
+            for (const edgeKey of s.drawnEdges) {
+                const [from, to] = edgeKey.split('-').map(Number);
+                const fromPos = layout.positions[from];
+                const toPos = layout.positions[to];
+                if (fromPos && toPos) {
+                    ctx.strokeStyle = 'rgba(92, 107, 192, 0.4)';
+                    ctx.lineWidth = 1.5;
+                    ctx.beginPath();
+                    ctx.moveTo(fromPos.x, fromPos.y + nodeRadius);
+                    ctx.lineTo(toPos.x, toPos.y - nodeRadius);
+                    ctx.stroke();
+                }
+            }
+
+            // Draw filled nodes
+            for (const [nodeIdx, info] of s.filledNodes) {
+                const pos = layout.positions[nodeIdx];
+                if (!pos) continue;
+                drawStaticNode(ctx, pos.x, pos.y, nodeRadius, info.value,
+                    pos.start === pos.end ? `[${pos.start}]` : `[${pos.start}-${pos.end}]`,
+                    info.isLeaf, false);
+            }
+
+            // Animate current step
+            if (currentStepIdx < s.dfsSteps.length) {
+                const step = s.dfsSteps[currentStepIdx];
+                const animT = easeInOut(stepT);
+                drawActiveStep(ctx, s, step, animT, layout, nodeRadius);
+
+                // Update status
+                const stepDesc = getStepDescription(step);
+                document.getElementById('build-anim-status').textContent =
+                    `Step ${currentStepIdx + 1}/${s.dfsSteps.length}: ${stepDesc}`;
+            }
+
+            // Draw created-but-not-yet-filled nodes (with highlight for current)
+            for (const nodeIdx of s.createdNodes) {
+                if (s.filledNodes.has(nodeIdx)) continue;
+                const pos = layout.positions[nodeIdx];
+                if (!pos) continue;
+                const isCurrent = currentStepIdx < s.dfsSteps.length &&
+                    s.dfsSteps[currentStepIdx].nodeIdx === nodeIdx &&
+                    s.dfsSteps[currentStepIdx].type === 'create_node';
+
+                // Draw unfilled node with range label
+                ctx.save();
+                if (isCurrent && stepT < 0.8) {
+                    ctx.shadowColor = '#b388ff';
+                    ctx.shadowBlur = 15;
+                }
+                // Background fill (darker, to show "created but empty")
+                ctx.fillStyle = 'rgba(22, 33, 62, 0.7)';
+                ctx.beginPath();
+                ctx.arc(pos.x, pos.y, nodeRadius, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.strokeStyle = '#b388ff';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([4, 3]);
+                ctx.beginPath();
+                ctx.arc(pos.x, pos.y, nodeRadius, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.restore();
+
+                // Question mark
+                ctx.fillStyle = 'rgba(179, 136, 255, 0.5)';
+                ctx.font = `bold ${Math.min(14, nodeRadius * 0.8)}px JetBrains Mono, monospace`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('?', pos.x, pos.y);
+
+                // Range label
+                const rangeLabel = pos.start === pos.end ? `[${pos.start}]` : `[${pos.start}-${pos.end}]`;
+                ctx.fillStyle = '#b388ff';
+                ctx.font = `${Math.min(9, nodeRadius * 0.5)}px JetBrains Mono, monospace`;
+                ctx.fillText(rangeLabel, pos.x, pos.y + nodeRadius + 10);
+            }
+
+            // Animation complete
+            if (currentStepIdx >= s.dfsSteps.length) {
+                recAnimState = null;
+                if (recAnimRAF) cancelAnimationFrame(recAnimRAF);
+                document.getElementById('btn-recursive-anim').textContent = '🔄 Recursive Build';
+                document.getElementById('build-anim-status').textContent = '✅ Complete!';
+                setTimeout(() => {
+                    document.getElementById('build-anim-status').textContent = '';
+                    drawSegTree();
+                }, 2000);
+                return;
+            }
+        }
+
+        recAnimRAF = requestAnimationFrame(animateRecursiveFrame);
+    }
+
+    function applyStepState(s, step) {
+        switch (step.type) {
+            case 'create_node':
+                s.createdNodes.add(step.nodeIdx);
+                break;
+            case 'fill_leaf':
+                s.filledNodes.set(step.nodeIdx, { value: step.value, isLeaf: true });
+                break;
+            case 'fill_parent':
+                s.filledNodes.set(step.nodeIdx, { value: step.value, isLeaf: false });
+                break;
+            case 'edge_down':
+                s.drawnEdges.add(`${step.fromNode}-${step.toNode}`);
+                break;
+            case 'return_up':
+                // Edge already drawn on the way down
+                break;
+        }
+    }
+
+    function drawFlatArray(ctx, leafNodes, flatPositions, alpha) {
+        leafNodes.forEach((leaf, i) => {
+            const fp = flatPositions[i];
+            const bx = fp.x - fp.w / 2;
+            const by = fp.y - fp.h / 2;
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = '#16213e';
+            ctx.strokeStyle = '#283593';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.rect(bx, by, fp.w, fp.h);
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.fillStyle = '#e8eaf6';
+            ctx.font = 'bold 14px JetBrains Mono, monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(nums[leaf.start], fp.x, fp.y);
+
+            ctx.fillStyle = '#5c6bc0';
+            ctx.font = '10px JetBrains Mono, monospace';
+            ctx.fillText(`[${leaf.start}]`, fp.x, fp.y + fp.h / 2 + 14);
+            ctx.globalAlpha = 1;
+        });
+    }
+
+    function drawMorphToGhosts(ctx, layout, leafNodes, flatPositions, nodeRadius, t, n) {
+        // Morph array boxes to ghost circles at ALL node positions
+        // Leaf nodes move from flat positions; internal nodes fade in at their positions
+
+        // Draw all nodes as ghosts
+        for (const [nodeIdx, pos] of Object.entries(layout.positions)) {
+            const isLeaf = pos.start === pos.end;
+            const leafIndex = isLeaf ? leafNodes.findIndex(l => l.nodeIdx === parseInt(nodeIdx)) : -1;
+
+            let cx, cy;
+            if (isLeaf && leafIndex >= 0) {
+                // Interpolate from flat position
+                const fp = flatPositions[leafIndex];
+                cx = fp.x + (pos.x - fp.x) * t;
+                cy = fp.y + (pos.y - fp.y) * t;
+            } else {
+                // Fade in at position
+                cx = pos.x;
+                cy = pos.y;
+            }
+
+            const alpha = isLeaf ? 1 : Math.max(0, (t - 0.3) / 0.7);
+            ctx.globalAlpha = alpha;
+
+            // Morphing shape for leaves
+            if (isLeaf && leafIndex >= 0) {
+                const fp = flatPositions[leafIndex];
+                const halfW = fp.w / 2 * (1 - t) + nodeRadius * t;
+                const halfH = fp.h / 2 * (1 - t) + nodeRadius * t;
+                const cornerR = nodeRadius * t;
+
+                // Ghost fill style
+                ctx.fillStyle = 'rgba(22, 33, 62, 0.3)';
+                ctx.beginPath();
+                if (t < 0.95) {
+                    ctx.roundRect(cx - halfW, cy - halfH, halfW * 2, halfH * 2, cornerR);
+                } else {
+                    ctx.arc(cx, cy, nodeRadius, 0, Math.PI * 2);
+                }
+                ctx.fill();
+
+                // Green dashed border
+                ctx.strokeStyle = '#3da35a';
+                ctx.lineWidth = 1.5;
+                ctx.setLineDash([4, 3]);
+                ctx.beginPath();
+                if (t < 0.95) {
+                    ctx.roundRect(cx - halfW, cy - halfH, halfW * 2, halfH * 2, cornerR);
+                } else {
+                    ctx.arc(cx, cy, nodeRadius, 0, Math.PI * 2);
+                }
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                // Value text (fades to ?)
+                ctx.fillStyle = `rgba(232, 234, 246, ${1 - t * 0.7})`;
+                ctx.font = `bold ${Math.min(13, nodeRadius * 0.8)}px JetBrains Mono, monospace`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                if (t < 0.6) {
+                    ctx.fillText(nums[pos.start], cx, cy);
+                } else {
+                    ctx.fillStyle = 'rgba(61, 163, 90, 0.4)';
+                    ctx.fillText('?', cx, cy);
+                }
+            } else {
+                // Internal node ghost
+                ctx.fillStyle = 'rgba(22, 33, 62, 0.3)';
+                ctx.beginPath();
+                ctx.arc(cx, cy, nodeRadius, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.strokeStyle = '#5c6bc0';
+                ctx.lineWidth = 1.5;
+                ctx.setLineDash([4, 3]);
+                ctx.beginPath();
+                ctx.arc(cx, cy, nodeRadius, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                ctx.fillStyle = 'rgba(92, 107, 192, 0.3)';
+                ctx.font = `bold ${Math.min(13, nodeRadius * 0.8)}px JetBrains Mono, monospace`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('?', cx, cy);
+            }
+
+            // Range label
+            const rangeLabel = pos.start === pos.end ? `[${pos.start}]` : `[${pos.start}-${pos.end}]`;
+            ctx.fillStyle = isLeaf ? '#3da35a' : '#5c6bc0';
+            ctx.font = `${Math.min(9, nodeRadius * 0.5)}px JetBrains Mono, monospace`;
+            ctx.textAlign = 'center';
+            ctx.fillText(rangeLabel, cx, cy + nodeRadius + 10);
+
+            ctx.globalAlpha = 1;
+        }
+
+        // Draw ghost edges (fade in with internal nodes)
+        if (t > 0.4) {
+            const edgeAlpha = (t - 0.4) / 0.6;
+            ctx.globalAlpha = edgeAlpha * 0.2;
+            for (const [nodeIdx, pos] of Object.entries(layout.positions)) {
+                if (pos.start !== pos.end) {
+                    const ni = parseInt(nodeIdx);
+                    const leftChild = layout.positions[2 * ni];
+                    const rightChild = layout.positions[2 * ni + 1];
+                    if (leftChild && rightChild) {
+                        ctx.strokeStyle = 'rgba(92, 107, 192, 0.3)';
+                        ctx.lineWidth = 1;
+                        ctx.setLineDash([4, 3]);
+                        ctx.beginPath();
+                        ctx.moveTo(pos.x, pos.y + nodeRadius);
+                        ctx.lineTo(leftChild.x, leftChild.y - nodeRadius);
+                        ctx.stroke();
+                        ctx.beginPath();
+                        ctx.moveTo(pos.x, pos.y + nodeRadius);
+                        ctx.lineTo(rightChild.x, rightChild.y - nodeRadius);
+                        ctx.stroke();
+                        ctx.setLineDash([]);
+                    }
+                }
+            }
+            ctx.globalAlpha = 1;
+        }
+    }
+
+    function drawAllGhostNodes(ctx, layout, nodeRadius, n) {
+        // Draw all nodes as faint ghosts (background layer)
+        for (const [nodeIdx, pos] of Object.entries(layout.positions)) {
+            ctx.fillStyle = 'rgba(22, 33, 62, 0.15)';
+            ctx.beginPath();
+            ctx.arc(pos.x, pos.y, nodeRadius, 0, Math.PI * 2);
+            ctx.fill();
+
+            const isLeaf = pos.start === pos.end;
+            ctx.strokeStyle = isLeaf ? 'rgba(61, 163, 90, 0.15)' : 'rgba(92, 107, 192, 0.15)';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([4, 3]);
+            ctx.beginPath();
+            ctx.arc(pos.x, pos.y, nodeRadius, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        // Ghost edges
+        for (const [nodeIdx, pos] of Object.entries(layout.positions)) {
+            if (pos.start !== pos.end) {
+                const ni = parseInt(nodeIdx);
+                const leftChild = layout.positions[2 * ni];
+                const rightChild = layout.positions[2 * ni + 1];
+                if (leftChild && rightChild) {
+                    ctx.strokeStyle = 'rgba(92, 107, 192, 0.08)';
+                    ctx.lineWidth = 1;
+                    ctx.setLineDash([4, 3]);
+                    ctx.beginPath();
+                    ctx.moveTo(pos.x, pos.y + nodeRadius);
+                    ctx.lineTo(leftChild.x, leftChild.y - nodeRadius);
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.moveTo(pos.x, pos.y + nodeRadius);
+                    ctx.lineTo(rightChild.x, rightChild.y - nodeRadius);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
+            }
+        }
+    }
+
+    function drawActiveStep(ctx, s, step, t, layout, nodeRadius) {
+        switch (step.type) {
+            case 'create_node': {
+                // Node appears with glow
+                const pos = layout.positions[step.nodeIdx];
+                if (!pos) break;
+                const scale = easeInOut(t);
+                ctx.save();
+                ctx.translate(pos.x, pos.y);
+                ctx.scale(scale, scale);
+                ctx.translate(-pos.x, -pos.y);
+
+                ctx.shadowColor = '#b388ff';
+                ctx.shadowBlur = 20 * (1 - t * 0.5);
+
+                ctx.fillStyle = 'rgba(22, 33, 62, 0.7)';
+                ctx.beginPath();
+                ctx.arc(pos.x, pos.y, nodeRadius, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.strokeStyle = '#b388ff';
+                ctx.lineWidth = 2.5;
+                ctx.setLineDash([4, 3]);
+                ctx.beginPath();
+                ctx.arc(pos.x, pos.y, nodeRadius, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                ctx.shadowBlur = 0;
+                ctx.restore();
+
+                // Label: CacheTree(start, end)
+                if (t > 0.3) {
+                    const labelAlpha = Math.min(1, (t - 0.3) / 0.4);
+                    ctx.globalAlpha = labelAlpha;
+                    ctx.fillStyle = '#ffd740';
+                    ctx.font = 'bold 10px JetBrains Mono, monospace';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(`CacheTree(${step.start}, ${step.end})`, pos.x, pos.y - nodeRadius - 14);
+                    ctx.globalAlpha = 1;
+                }
+                break;
+            }
+            case 'edge_down': {
+                // Edge appears with range label flowing down
+                const fromPos = layout.positions[step.fromNode];
+                const toPos = layout.positions[step.toNode];
+                if (!fromPos || !toPos) break;
+
+                const startX = fromPos.x, startY = fromPos.y + nodeRadius;
+                const endX = toPos.x, endY = toPos.y - nodeRadius;
+                const curX = startX + (endX - startX) * t;
+                const curY = startY + (endY - startY) * t;
+
+                // Draw animated edge
+                ctx.save();
+                ctx.shadowColor = '#ffd740';
+                ctx.shadowBlur = 8;
+                ctx.strokeStyle = '#ffd740';
+                ctx.lineWidth = 2.5;
+                ctx.beginPath();
+                ctx.moveTo(startX, startY);
+                ctx.lineTo(curX, curY);
+                ctx.stroke();
+                ctx.restore();
+
+                // Range label flowing down the edge
+                const labelX = curX;
+                const labelY = curY;
+                ctx.fillStyle = '#ffd740';
+                ctx.font = 'bold 10px JetBrains Mono, monospace';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                // Draw background pill
+                const label = `[${step.childStart},${step.childEnd}]`;
+                const textW = ctx.measureText(label).width + 10;
+                ctx.fillStyle = 'rgba(15, 15, 26, 0.85)';
+                ctx.beginPath();
+                ctx.roundRect(labelX - textW / 2, labelY - 8, textW, 16, 4);
+                ctx.fill();
+                ctx.fillStyle = '#ffd740';
+                ctx.fillText(label, labelX, labelY);
+
+                // Arrow indicator
+                if (t > 0.5) {
+                    ctx.fillText('↓', labelX, labelY + 14);
+                }
+                break;
+            }
+            case 'return_up': {
+                // Sum value flows UP the edge
+                const fromPos = layout.positions[step.fromNode];
+                const toPos = layout.positions[step.toNode];
+                if (!fromPos || !toPos) break;
+
+                const startX = fromPos.x, startY = fromPos.y - nodeRadius;
+                const endX = toPos.x, endY = toPos.y + nodeRadius;
+                const curX = startX + (endX - startX) * t;
+                const curY = startY + (endY - startY) * t;
+
+                // Draw return edge glow
+                ctx.save();
+                ctx.shadowColor = '#69f0ae';
+                ctx.shadowBlur = 8;
+                ctx.strokeStyle = '#69f0ae';
+                ctx.lineWidth = 2.5;
+                ctx.beginPath();
+                ctx.moveTo(startX, startY);
+                ctx.lineTo(curX, curY);
+                ctx.stroke();
+                ctx.restore();
+
+                // Value label flowing up
+                const label = `${step.value}`;
+                ctx.fillStyle = 'rgba(15, 15, 26, 0.85)';
+                ctx.beginPath();
+                const textW = ctx.measureText(label).width + 14;
+                ctx.roundRect(curX - textW / 2, curY - 9, textW, 18, 4);
+                ctx.fill();
+                ctx.fillStyle = '#69f0ae';
+                ctx.font = 'bold 11px JetBrains Mono, monospace';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(label, curX, curY);
+
+                if (t > 0.5) {
+                    ctx.fillText('↑', curX, curY - 14);
+                }
+                break;
+            }
+            case 'fill_leaf': {
+                // Leaf fills with value — green glow
+                const pos = layout.positions[step.nodeIdx];
+                if (!pos) break;
+
+                ctx.save();
+                ctx.shadowColor = '#69f0ae';
+                ctx.shadowBlur = 20 * (1 - t * 0.5);
+
+                ctx.fillStyle = '#3da35a';
+                ctx.beginPath();
+                ctx.arc(pos.x, pos.y, nodeRadius, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.strokeStyle = '#2d8044';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(pos.x, pos.y, nodeRadius, 0, Math.PI * 2);
+                ctx.stroke();
+
+                ctx.shadowBlur = 0;
+                ctx.restore();
+
+                // Value
+                ctx.fillStyle = '#e8eaf6';
+                ctx.font = `bold ${Math.min(13, nodeRadius * 0.8)}px JetBrains Mono, monospace`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(step.value, pos.x, pos.y);
+
+                // Label
+                ctx.fillStyle = '#3da35a';
+                ctx.font = `${Math.min(9, nodeRadius * 0.5)}px JetBrains Mono, monospace`;
+                ctx.fillText(`[${step.start}]`, pos.x, pos.y + nodeRadius + 10);
+
+                // "nums[i] =" annotation
+                if (t > 0.3 && t < 0.9) {
+                    const annAlpha = Math.min(1, (t - 0.3) / 0.3) * (t < 0.7 ? 1 : (0.9 - t) / 0.2);
+                    ctx.globalAlpha = annAlpha;
+                    ctx.fillStyle = '#ffd740';
+                    ctx.font = 'bold 10px JetBrains Mono, monospace';
+                    ctx.fillText(`val = nums[${step.start}] = ${step.value}`, pos.x, pos.y - nodeRadius - 14);
+                    ctx.globalAlpha = 1;
+                }
+                break;
+            }
+            case 'fill_parent': {
+                // Parent fills with sum of children
+                const pos = layout.positions[step.nodeIdx];
+                if (!pos) break;
+
+                // Show sum calculation above
+                if (t < 0.7) {
+                    const labelAlpha = t < 0.15 ? t / 0.15 : (t > 0.55 ? (0.7 - t) / 0.15 : 1);
+                    ctx.globalAlpha = Math.max(0, labelAlpha);
+                    ctx.fillStyle = '#ffd740';
+                    ctx.font = 'bold 11px JetBrains Mono, monospace';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(`${step.leftVal} + ${step.rightVal} = ${step.value}`, pos.x, pos.y - nodeRadius - 18);
+                    ctx.globalAlpha = 1;
+                }
+
+                // Node fills in
+                if (t > 0.3) {
+                    const fillT = Math.min(1, (t - 0.3) / 0.7);
+                    ctx.save();
+                    ctx.shadowColor = '#7c4dff';
+                    ctx.shadowBlur = 15 * (1 - fillT);
+
+                    ctx.fillStyle = '#16213e';
+                    ctx.beginPath();
+                    ctx.arc(pos.x, pos.y, nodeRadius, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.strokeStyle = '#283593';
+                    ctx.lineWidth = 1.5;
+                    ctx.beginPath();
+                    ctx.arc(pos.x, pos.y, nodeRadius, 0, Math.PI * 2);
+                    ctx.stroke();
+
+                    ctx.shadowBlur = 0;
+                    ctx.restore();
+
+                    // Value
+                    ctx.fillStyle = '#e8eaf6';
+                    ctx.font = `bold ${Math.min(13, nodeRadius * 0.8)}px JetBrains Mono, monospace`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(step.value, pos.x, pos.y);
+
+                    // Range label
+                    ctx.fillStyle = '#5c6bc0';
+                    ctx.font = `${Math.min(9, nodeRadius * 0.5)}px JetBrains Mono, monospace`;
+                    ctx.fillText(`[${step.start}-${step.end}]`, pos.x, pos.y + nodeRadius + 10);
+                }
+                break;
+            }
+        }
+    }
+
+    function getStepDescription(step) {
+        switch (step.type) {
+            case 'create_node':
+                return `Create node [${step.start}-${step.end}]`;
+            case 'edge_down':
+                return `Recurse → [${step.childStart},${step.childEnd}]`;
+            case 'return_up':
+                return `Return sum = ${step.value}`;
+            case 'fill_leaf':
+                return `Fill leaf [${step.start}] = ${step.value}`;
+            case 'fill_parent':
+                return `${step.leftVal} + ${step.rightVal} = ${step.value}`;
+            default:
+                return '';
+        }
     }
 
     // ==============================
