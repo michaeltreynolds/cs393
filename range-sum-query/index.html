@@ -735,6 +735,7 @@
                     <div style="margin-top: 12px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
                         <button class="btn btn-purple" id="btn-build-anim" onclick="startBuildAnimation()">🎬 Conceptual Build</button>
                         <button class="btn btn-primary" id="btn-recursive-anim" onclick="startRecursiveBuildAnimation()">🔄 Recursive Build</button>
+                        <button class="btn btn-orange" id="btn-large-demo" onclick="startLargeDemoAnimation()">🎯 Large Demo</button>
                         <span id="build-anim-status" style="font-size: 0.8rem; color: var(--text-muted);"></span>
                     </div>
                 </div>
@@ -2630,6 +2631,421 @@
                 return `${step.leftVal} + ${step.rightVal} = ${step.value}`;
             default:
                 return '';
+        }
+    }
+
+    // ==============================
+    // Large Demo (32 elements)
+    // ==============================
+    let largeDemoState = null;
+    let largeDemoRAF = null;
+    const LD_ARR = [3,1,4,1,5,9,2,6,5,3,5,8,9,7,9,3,2,3,8,4,6,2,6,4,3,3,8,3,2,7,9,5];
+    const LD_OPS = [
+        {type:'query', left:5, right:22},
+        {type:'update', index:15, nv:1},
+        {type:'query', left:10, right:25},
+        {type:'update', index:3, nv:9},
+        {type:'query', left:0, right:11},
+        {type:'update', index:20, nv:5},
+    ];
+
+    function ldBuild(arr) {
+        const t = new Array(4*arr.length).fill(0);
+        function b(nd,s,e) {
+            if (s===e) { t[nd]=arr[s]; return; }
+            const m=(s+e)>>1; b(2*nd,s,m); b(2*nd+1,m+1,e);
+            t[nd]=t[2*nd]+t[2*nd+1];
+        }
+        b(1,0,arr.length-1); return t;
+    }
+
+    function ldQuerySteps(st,n,qL,qR) {
+        const steps=[]; let rs=0;
+        function dfs(nd,s,e) {
+            if (s>qR||e<qL) { steps.push({t:'out',nd,s,e}); return 0; }
+            if (s>=qL&&e<=qR) { rs+=st[nd]; steps.push({t:'full',nd,s,e,v:st[nd],rs}); return st[nd]; }
+            steps.push({t:'part',nd,s,e});
+            const m=(s+e)>>1, l=dfs(2*nd,s,m), r=dfs(2*nd+1,m+1,e);
+            steps.push({t:'pdone',nd,s,e,v:l+r,rs});
+            return l+r;
+        }
+        const total=dfs(1,0,n-1); return {steps,total};
+    }
+
+    function ldUpdateSteps(st,n,idx,nv) {
+        const path=[];
+        function fp(nd,s,e) { path.push({nd,s,e}); if(s===e) return; const m=(s+e)>>1; if(idx<=m) fp(2*nd,s,m); else fp(2*nd+1,m+1,e); }
+        fp(1,0,n-1);
+        const steps=[];
+        for (const p of path) steps.push({t:'down',nd:p.nd,s:p.s,e:p.e,idx});
+        const leaf=path[path.length-1];
+        steps.push({t:'leaf',nd:leaf.nd,s:leaf.s,e:leaf.e,ov:st[leaf.nd],nv});
+        const nt=[...st]; nt[leaf.nd]=nv;
+        for (let i=path.length-2;i>=0;i--) {
+            const p=path[i],lc=2*p.nd,rc=2*p.nd+1;
+            const ov=nt[p.nd]; nt[p.nd]=nt[lc]+nt[rc];
+            const onP=path[i+1].nd, offP=(onP===lc)?rc:lc;
+            steps.push({t:'up',nd:p.nd,s:p.s,e:p.e,ov,nv:nt[p.nd],lv:nt[lc],rv:nt[rc],offNd:offP,offV:nt[offP]});
+        }
+        return {steps,newTree:nt};
+    }
+
+    function startLargeDemoAnimation() {
+        if (buildAnimState) { cancelAnimationFrame(buildAnimRAF); buildAnimState=null; document.getElementById('btn-build-anim').textContent='🎬 Conceptual Build'; }
+        if (recAnimState) { cancelAnimationFrame(recAnimRAF); recAnimState=null; document.getElementById('btn-recursive-anim').textContent='🔄 Recursive Build'; }
+        if (largeDemoState) {
+            cancelAnimationFrame(largeDemoRAF); largeDemoState=null; drawSegTree();
+            document.getElementById('btn-large-demo').textContent='🎯 Large Demo';
+            document.getElementById('build-anim-status').textContent=''; return;
+        }
+
+        const canvas=document.getElementById('segtree-canvas');
+        const rect=canvas.parentElement.getBoundingClientRect();
+        const W=rect.width, H=rect.height, n=32;
+        const dArr=[...LD_ARR];
+        let dTree=ldBuild(dArr);
+        // Layout: tree uses top 75%, array uses bottom 25%
+        const treeH=H*0.73;
+        const layout=getSegTreeLayout(W, treeH, n);
+        for (const p of Object.values(layout.positions)) p.y+=22;
+
+        // Pre-generate all op steps sequentially
+        const opData=[];
+        for (const op of LD_OPS) {
+            if (op.type==='query') {
+                const d=ldQuerySteps(dTree,n,op.left,op.right);
+                opData.push({...op,steps:d.steps,total:d.total});
+            } else {
+                const d=ldUpdateSteps(dTree,n,op.index,op.nv);
+                opData.push({...op,steps:d.steps,newTree:d.newTree});
+                dTree=d.newTree;
+            }
+        }
+
+        largeDemoState={
+            start:performance.now(), dArr:[...LD_ARR], dTree:ldBuild([...LD_ARR]),
+            layout, n, W, H, opData, phase:'build', phaseStart:performance.now(),
+            currentOp:0, nodeStates:new Map(),
+            BUILD_DUR:2500, LABEL_DUR:1500, STEP_Q:320, STEP_U:420, RESULT_DUR:2000, FADE_DUR:800,
+        };
+        document.getElementById('btn-large-demo').textContent='⏹ Stop';
+        document.getElementById('build-anim-status').textContent='Building 32-element tree...';
+        segHighlightNodes=[]; segQueryRangeNodes=[]; segTraversedEdges=[];
+        largeDemoRAF=requestAnimationFrame(ldFrame);
+    }
+
+    function ldFrame(now) {
+        if (!largeDemoState) return;
+        const s=largeDemoState, elapsed=now-s.phaseStart;
+        const canvas=document.getElementById('segtree-canvas');
+        const ctx=canvas.getContext('2d');
+        const rect=canvas.parentElement.getBoundingClientRect();
+        canvas.width=rect.width*2; canvas.height=rect.height*2;
+        ctx.setTransform(2,0,0,2,0,0);
+        const W=rect.width, H=rect.height;
+        ctx.clearRect(0,0,W,H);
+        const {layout,n,opData}=s, {nodeRadius}=layout;
+        const arrY=H*0.78; // array top
+
+        if (s.phase==='build') {
+            const lvl=Math.min(layout.depth, Math.floor(elapsed/(s.BUILD_DUR/(layout.depth+1))));
+            document.getElementById('build-anim-status').textContent=`Building... level ${lvl}/${layout.depth}`;
+            ldDrawTree(ctx,s,layout,nodeRadius,lvl,null);
+            ldDrawArr(ctx,s,W,arrY,-1,-1,-1);
+            if (elapsed>=s.BUILD_DUR) { s.phase='label'; s.phaseStart=now; s.nodeStates.clear(); }
+        } else if (s.phase==='label') {
+            const op=opData[s.currentOp], a=easeInOut(Math.min(1,elapsed/500));
+            ldDrawTree(ctx,s,layout,nodeRadius,layout.depth,null);
+            const qL=op.type==='query'?op.left:-1, qR=op.type==='query'?op.right:-1;
+            ldDrawArr(ctx,s,W,arrY,qL,qR,op.type==='update'?op.index:-1);
+            ctx.globalAlpha=a;
+            ldDrawLabel(ctx,op,W,s.currentOp);
+            ctx.globalAlpha=1;
+            const desc=op.type==='query'?`sumRange(${op.left}, ${op.right})`:`update(${op.index}, ${op.nv})`;
+            document.getElementById('build-anim-status').textContent=`Op ${s.currentOp+1}/6: ${desc}`;
+            if (elapsed>=s.LABEL_DUR) { s.phase='exec'; s.phaseStart=now; s.nodeStates.clear(); }
+        } else if (s.phase==='exec') {
+            const op=opData[s.currentOp];
+            const sd=op.type==='query'?s.STEP_Q:s.STEP_U;
+            const ci=Math.floor(elapsed/sd), st=easeInOut(Math.min(1,(elapsed%sd)/(sd*0.7)));
+            // Apply completed steps
+            for (let i=0;i<Math.min(ci,op.steps.length);i++) ldApply(s,op.steps[i],op);
+            // Draw
+            ldDrawTree(ctx,s,layout,nodeRadius,layout.depth,ci<op.steps.length?op.steps[ci]:null);
+            const qL=op.type==='query'?op.left:-1, qR=op.type==='query'?op.right:-1;
+            ldDrawArr(ctx,s,W,arrY,qL,qR,op.type==='update'?op.index:-1);
+            ldDrawLabel(ctx,op,W,s.currentOp);
+            // Active step overlay
+            if (ci<op.steps.length) {
+                ldDrawStep(ctx,s,op.steps[ci],st,layout,nodeRadius,op);
+                document.getElementById('build-anim-status').textContent=`Step ${ci+1}/${op.steps.length}: ${ldStepDesc(op.steps[ci],op)}`;
+            }
+            // Running sum for queries
+            if (op.type==='query') {
+                let lastRS=0;
+                for (let i=Math.min(ci,op.steps.length)-1;i>=0;i--) { if (op.steps[i].rs!==undefined) { lastRS=op.steps[i].rs; break; } }
+                if (lastRS>0) {
+                    ctx.fillStyle='rgba(15,15,26,0.8)'; ctx.beginPath();
+                    ctx.roundRect(W-110,4,106,22,6); ctx.fill();
+                    ctx.fillStyle='#69f0ae'; ctx.font='bold 11px JetBrains Mono,monospace';
+                    ctx.textAlign='right'; ctx.textBaseline='middle';
+                    ctx.fillText(`sum = ${lastRS}`,W-10,15);
+                }
+            }
+            if (ci>=op.steps.length) { s.phase='result'; s.phaseStart=now; }
+        } else if (s.phase==='result') {
+            const op=opData[s.currentOp];
+            for (const step of op.steps) ldApply(s,step,op);
+            if (op.type==='update' && op.newTree) { s.dTree=[...op.newTree]; s.dArr[op.index]=op.nv; }
+            ldDrawTree(ctx,s,layout,nodeRadius,layout.depth,null);
+            const qL=op.type==='query'?op.left:-1, qR=op.type==='query'?op.right:-1;
+            ldDrawArr(ctx,s,W,arrY,qL,qR,op.type==='update'?op.index:-1);
+            if (op.type==='query') {
+                ctx.fillStyle='#0a0e1a'; ctx.beginPath(); ctx.roundRect(W/2-80,2,160,24,8); ctx.fill();
+                ctx.fillStyle='#69f0ae'; ctx.font='bold 16px JetBrains Mono,monospace';
+                ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(`Sum = ${op.total}`,W/2,14);
+            } else {
+                ctx.fillStyle='#0a0e1a'; ctx.beginPath(); ctx.roundRect(W/2-100,2,200,24,8); ctx.fill();
+                ctx.fillStyle='#ffab40'; ctx.font='bold 13px JetBrains Mono,monospace';
+                ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(`arr[${op.index}] = ${op.nv} ✓`,W/2,14);
+            }
+            document.getElementById('build-anim-status').textContent=op.type==='query'?`Result: sum = ${op.total}`:`Updated arr[${op.index}] = ${op.nv}`;
+            if (elapsed>=s.RESULT_DUR) { s.phase='fade'; s.phaseStart=now; }
+        } else if (s.phase==='fade') {
+            s.nodeStates.clear();
+            ldDrawTree(ctx,s,layout,nodeRadius,layout.depth,null);
+            ldDrawArr(ctx,s,W,arrY,-1,-1,-1);
+            if (elapsed>=s.FADE_DUR) {
+                s.currentOp++;
+                if (s.currentOp>=opData.length) {
+                    largeDemoState=null; cancelAnimationFrame(largeDemoRAF);
+                    document.getElementById('btn-large-demo').textContent='🎯 Large Demo';
+                    document.getElementById('build-anim-status').textContent='✅ Demo Complete!';
+                    setTimeout(()=>{ document.getElementById('build-anim-status').textContent=''; drawSegTree(); },2000);
+                    return;
+                }
+                s.phase='label'; s.phaseStart=now; s.nodeStates.clear();
+            }
+        }
+        largeDemoRAF=requestAnimationFrame(ldFrame);
+    }
+
+    function ldApply(s,step,op) {
+        if (step.t==='out') s.nodeStates.set(step.nd,'out');
+        else if (step.t==='full') s.nodeStates.set(step.nd,'full');
+        else if (step.t==='part') s.nodeStates.set(step.nd,'part');
+        else if (step.t==='pdone') s.nodeStates.set(step.nd,'pdone');
+        else if (step.t==='down') s.nodeStates.set(step.nd,'upath');
+        else if (step.t==='leaf') { s.nodeStates.set(step.nd,'uleaf'); }
+        else if (step.t==='up') s.nodeStates.set(step.nd,'udone');
+    }
+
+    function ldDrawTree(ctx,s,layout,r,maxLvl,activeStep) {
+        const {positions}=layout;
+        // Edges
+        for (const [ni,pos] of Object.entries(positions)) {
+            const nd=parseInt(ni);
+            if (pos.start!==pos.end && pos.level<maxLvl) {
+                const lc=positions[2*nd], rc=positions[2*nd+1];
+                const st=s.nodeStates.get(nd);
+                let col='rgba(92,107,192,0.25)', lw=1;
+                if (st==='full') { col='rgba(105,240,174,0.4)'; lw=1.5; }
+                else if (st==='part'||st==='pdone') { col='rgba(255,215,64,0.4)'; lw=1.5; }
+                else if (st==='upath'||st==='udone') { col='rgba(77,208,225,0.5)'; lw=1.5; }
+                ctx.strokeStyle=col; ctx.lineWidth=lw;
+                if (lc) { ctx.beginPath(); ctx.moveTo(pos.x,pos.y+r); ctx.lineTo(lc.x,lc.y-r); ctx.stroke(); }
+                if (rc) { ctx.beginPath(); ctx.moveTo(pos.x,pos.y+r); ctx.lineTo(rc.x,rc.y-r); ctx.stroke(); }
+            }
+        }
+        // Nodes
+        for (const [ni,pos] of Object.entries(positions)) {
+            if (pos.level>maxLvl) continue;
+            const nd=parseInt(ni), st=s.nodeStates.get(nd), isLeaf=pos.start===pos.end;
+            let fill, stroke, glow=null, showVal=true, textCol='#e8eaf6';
+            if (!st) { fill=isLeaf?'#3da35a':'#16213e'; stroke=isLeaf?'#2d8044':'#283593'; }
+            else if (st==='full') { fill='#2e7d32'; stroke='#4caf50'; glow='#69f0ae'; }
+            else if (st==='out') { fill='rgba(22,33,62,0.25)'; stroke='rgba(40,53,147,0.25)'; textCol='rgba(232,234,246,0.2)'; }
+            else if (st==='part') { fill='#1a237e'; stroke='#ffd740'; glow='#ffd740'; }
+            else if (st==='pdone') { fill='#16213e'; stroke='#ffd740'; }
+            else if (st==='upath') { fill=isLeaf?'#00897b':'#006064'; stroke='#4dd0e1'; glow='#4dd0e1'; }
+            else if (st==='uleaf') { fill='#e65100'; stroke='#ff6d00'; glow='#ffab40'; }
+            else if (st==='udone') { fill='#004d40'; stroke='#26a69a'; glow='#69f0ae'; }
+            else { fill=isLeaf?'#3da35a':'#16213e'; stroke=isLeaf?'#2d8044':'#283593'; }
+
+            ctx.save();
+            if (glow) { ctx.shadowColor=glow; ctx.shadowBlur=8; }
+            ctx.fillStyle=fill; ctx.beginPath(); ctx.arc(pos.x,pos.y,r,0,Math.PI*2); ctx.fill();
+            ctx.shadowBlur=0;
+            ctx.strokeStyle=stroke; ctx.lineWidth=st?1.5:1;
+            ctx.beginPath(); ctx.arc(pos.x,pos.y,r,0,Math.PI*2); ctx.stroke();
+            ctx.restore();
+            // Value
+            if (showVal) {
+                ctx.fillStyle=textCol; ctx.font=`bold ${Math.min(9,r*0.75)}px JetBrains Mono,monospace`;
+                ctx.textAlign='center'; ctx.textBaseline='middle';
+                ctx.fillText(s.dTree[nd],pos.x,pos.y);
+            }
+        }
+    }
+
+    function ldDrawArr(ctx,s,W,y,qL,qR,uIdx) {
+        const n=s.n, cellW=(W-40)/n, cellH=16, x0=20;
+        for (let i=0;i<n;i++) {
+            const cx=x0+i*cellW;
+            const inRange=(qL>=0 && i>=qL && i<=qR);
+            const isUpd=(uIdx>=0 && i===uIdx);
+            ctx.fillStyle=inRange?'rgba(105,240,174,0.15)':(isUpd?'rgba(255,171,64,0.2)':'rgba(22,33,62,0.5)');
+            ctx.fillRect(cx,y,cellW-1,cellH);
+            ctx.strokeStyle=inRange?'rgba(105,240,174,0.4)':(isUpd?'rgba(255,171,64,0.5)':'rgba(92,107,192,0.2)');
+            ctx.lineWidth=1; ctx.strokeRect(cx,y,cellW-1,cellH);
+            ctx.fillStyle=inRange?'#69f0ae':(isUpd?'#ffab40':'#8c9eff');
+            ctx.font=`${Math.min(9,cellW*0.5)}px JetBrains Mono,monospace`;
+            ctx.textAlign='center'; ctx.textBaseline='middle';
+            ctx.fillText(s.dArr[i],cx+cellW/2-0.5,y+cellH/2);
+        }
+        // U-bracket for query range
+        if (qL>=0) {
+            const bx=x0+qL*cellW-1, bw=(qR-qL+1)*cellW+1;
+            ctx.strokeStyle='#69f0ae'; ctx.lineWidth=2;
+            ctx.beginPath();
+            ctx.moveTo(bx,y); ctx.lineTo(bx,y+cellH+4); ctx.lineTo(bx+bw,y+cellH+4); ctx.lineTo(bx+bw,y);
+            ctx.stroke();
+            ctx.fillStyle='#69f0ae'; ctx.font='bold 9px JetBrains Mono,monospace';
+            ctx.textAlign='center'; ctx.fillText(`sumRange(${qL}, ${qR})`,bx+bw/2,y+cellH+14);
+        }
+        // Update marker
+        if (uIdx>=0) {
+            const ux=x0+uIdx*cellW+cellW/2;
+            ctx.fillStyle='#ffab40'; ctx.font='bold 9px JetBrains Mono,monospace';
+            ctx.textAlign='center'; ctx.fillText(`↑ [${uIdx}]`,ux,y+cellH+12);
+        }
+        // Index markers
+        ctx.fillStyle='rgba(92,107,192,0.3)'; ctx.font=`${Math.min(7,cellW*0.4)}px JetBrains Mono,monospace`;
+        ctx.textAlign='center';
+        for (let i=0;i<n;i+=4) ctx.fillText(i,x0+i*cellW+cellW/2,y-4);
+    }
+
+    function ldDrawLabel(ctx,op,W,idx) {
+        const labels=['①','②','③','④','⑤','⑥'];
+        let txt, col;
+        if (op.type==='query') { txt=`${labels[idx]} Query: sumRange(${op.left}, ${op.right})`; col='#69f0ae'; }
+        else { txt=`${labels[idx]} Update: arr[${op.index}] = ${op.nv}`; col='#ffab40'; }
+        ctx.fillStyle='rgba(15,15,26,0.85)'; ctx.beginPath();
+        const tw=ctx.measureText(txt).width||150;
+        ctx.roundRect(W/2-tw/2-12,2,tw+24,20,6); ctx.fill();
+        ctx.fillStyle=col; ctx.font='bold 11px JetBrains Mono,monospace';
+        ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(txt,W/2,12);
+    }
+
+    function ldDrawStep(ctx,s,step,t,layout,r,op) {
+        const pos=layout.positions[step.nd];
+        if (!pos) return;
+        switch(step.t) {
+            case 'full': {
+                ctx.save(); ctx.shadowColor='#69f0ae'; ctx.shadowBlur=15*(1-t*0.5);
+                ctx.strokeStyle='#69f0ae'; ctx.lineWidth=3;
+                ctx.beginPath(); ctx.arc(pos.x,pos.y,r+3,0,Math.PI*2); ctx.stroke();
+                ctx.shadowBlur=0; ctx.restore();
+                if (t>0.2&&t<0.9) {
+                    ctx.globalAlpha=Math.min(1,(t-0.2)/0.3)*(t<0.7?1:(0.9-t)/0.2);
+                    ctx.fillStyle='#69f0ae'; ctx.font='bold 9px JetBrains Mono,monospace';
+                    ctx.textAlign='center'; ctx.textBaseline='middle';
+                    ctx.fillText(`+${step.v}`,pos.x,pos.y-r-10);
+                    ctx.globalAlpha=1;
+                }
+                break;
+            }
+            case 'out': {
+                ctx.strokeStyle='rgba(244,67,54,0.4)'; ctx.lineWidth=1;
+                ctx.beginPath(); ctx.arc(pos.x,pos.y,r+2,0,Math.PI*2); ctx.stroke();
+                break;
+            }
+            case 'part': {
+                ctx.save(); ctx.shadowColor='#ffd740'; ctx.shadowBlur=12*(1-t*0.5);
+                ctx.strokeStyle='#ffd740'; ctx.lineWidth=2.5;
+                ctx.beginPath(); ctx.arc(pos.x,pos.y,r+3,0,Math.PI*2); ctx.stroke();
+                ctx.shadowBlur=0; ctx.restore();
+                if (t>0.3) {
+                    ctx.globalAlpha=Math.min(1,(t-0.3)/0.3);
+                    ctx.fillStyle='#ffd740'; ctx.font='bold 8px JetBrains Mono,monospace';
+                    ctx.textAlign='center'; ctx.fillText('split ↓',pos.x,pos.y-r-10);
+                    ctx.globalAlpha=1;
+                }
+                break;
+            }
+            case 'pdone': {
+                if (t>0.2) {
+                    ctx.globalAlpha=Math.min(1,(t-0.2)/0.3);
+                    ctx.fillStyle='#ffd740'; ctx.font='bold 9px JetBrains Mono,monospace';
+                    ctx.textAlign='center'; ctx.fillText(`= ${step.v}`,pos.x,pos.y-r-10);
+                    ctx.globalAlpha=1;
+                }
+                break;
+            }
+            case 'down': {
+                ctx.save(); ctx.shadowColor='#4dd0e1'; ctx.shadowBlur=12*(1-t*0.5);
+                ctx.strokeStyle='#4dd0e1'; ctx.lineWidth=2.5;
+                ctx.beginPath(); ctx.arc(pos.x,pos.y,r+3,0,Math.PI*2); ctx.stroke();
+                ctx.shadowBlur=0; ctx.restore();
+                if (t>0.3) {
+                    ctx.globalAlpha=Math.min(1,(t-0.3)/0.3);
+                    ctx.fillStyle='#4dd0e1'; ctx.font='bold 8px JetBrains Mono,monospace';
+                    ctx.textAlign='center'; ctx.fillText(`idx ${step.idx} ↓`,pos.x,pos.y-r-10);
+                    ctx.globalAlpha=1;
+                }
+                break;
+            }
+            case 'leaf': {
+                ctx.save(); ctx.shadowColor='#ffab40'; ctx.shadowBlur=18*(1-t*0.5);
+                ctx.strokeStyle='#ff6d00'; ctx.lineWidth=3;
+                ctx.beginPath(); ctx.arc(pos.x,pos.y,r+4,0,Math.PI*2); ctx.stroke();
+                ctx.shadowBlur=0; ctx.restore();
+                if (t>0.2) {
+                    ctx.globalAlpha=Math.min(1,(t-0.2)/0.3);
+                    ctx.fillStyle='#ffab40'; ctx.font='bold 9px JetBrains Mono,monospace';
+                    ctx.textAlign='center'; ctx.fillText(`${step.ov}→${step.nv}`,pos.x,pos.y-r-10);
+                    ctx.globalAlpha=1;
+                }
+                break;
+            }
+            case 'up': {
+                ctx.save(); ctx.shadowColor='#69f0ae'; ctx.shadowBlur=12*(1-t*0.5);
+                ctx.strokeStyle='#26a69a'; ctx.lineWidth=2.5;
+                ctx.beginPath(); ctx.arc(pos.x,pos.y,r+3,0,Math.PI*2); ctx.stroke();
+                ctx.shadowBlur=0; ctx.restore();
+                if (t>0.15&&t<0.9) {
+                    ctx.globalAlpha=Math.min(1,(t-0.15)/0.3)*(t<0.7?1:(0.9-t)/0.2);
+                    ctx.fillStyle='#69f0ae'; ctx.font='bold 8px JetBrains Mono,monospace';
+                    ctx.textAlign='center';
+                    ctx.fillText(`${step.lv}+${step.rv}=${step.nv}`,pos.x,pos.y-r-10);
+                    ctx.globalAlpha=1;
+                }
+                // Flash the untouched sibling
+                const offPos=layout.positions[step.offNd];
+                if (offPos && t>0.1&&t<0.6) {
+                    const a=Math.min(1,(t-0.1)/0.2)*(t<0.4?1:(0.6-t)/0.2);
+                    ctx.globalAlpha=a;
+                    ctx.strokeStyle='#80cbc4'; ctx.lineWidth=2;
+                    ctx.beginPath(); ctx.arc(offPos.x,offPos.y,r+2,0,Math.PI*2); ctx.stroke();
+                    ctx.fillStyle='#80cbc4'; ctx.font='bold 8px JetBrains Mono,monospace';
+                    ctx.textAlign='center'; ctx.fillText(`+${step.offV}`,offPos.x,offPos.y-r-8);
+                    ctx.globalAlpha=1;
+                }
+                break;
+            }
+        }
+    }
+
+    function ldStepDesc(step,op) {
+        switch(step.t) {
+            case 'out': return `[${step.s}-${step.e}] outside range`;
+            case 'full': return `[${step.s}-${step.e}] fully inside → +${step.v}`;
+            case 'part': return `[${step.s}-${step.e}] partial → split`;
+            case 'pdone': return `[${step.s}-${step.e}] = ${step.v}`;
+            case 'down': return `Going to [${step.s}-${step.e}] for idx ${step.idx}`;
+            case 'leaf': return `Leaf [${step.s}]: ${step.ov} → ${step.nv}`;
+            case 'up': return `[${step.s}-${step.e}]: ${step.lv}+${step.rv}=${step.nv}`;
+            default: return '';
         }
     }
 
