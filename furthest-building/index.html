@@ -598,11 +598,11 @@
                 <div class="card-title">Configuration</div>
                 <div class="input-group">
                     <label>Heights:</label>
-                    <input type="text" id="input-heights" value="4, 2, 7, 6, 9, 19, 12" placeholder="comma-separated">
+                    <input type="text" id="input-heights" value="2, 5, 3, 8, 7, 14, 11" placeholder="comma-separated">
                 </div>
                 <div class="input-group">
                     <label>Bricks:</label>
-                    <input type="number" id="input-bricks" value="5" min="0" max="1000">
+                    <input type="number" id="input-bricks" value="10" min="0" max="1000">
                 </div>
                 <div class="input-group">
                     <label>Ladders:</label>
@@ -612,7 +612,7 @@
                     <label>Preset:</label>
                     <select id="preset-select" onchange="loadPreset()">
                         <option value="">Custom</option>
-                        <option value="1">Example 1: [4,2,7,6,9,19,12] B=5 L=1</option>
+                        <option value="1">Example 1: [2,5,3,8,7,14,11] B=10 L=1</option>
                         <option value="2">Example 2: [4,12,2,7,3,18,20,3,19] B=10 L=2</option>
                         <option value="3">Staircase: [1,3,5,7,9,11,13] B=4 L=2</option>
                         <option value="4">Big Gap: [1,2,3,100,3,2,1] B=5 L=0</option>
@@ -623,7 +623,7 @@
                 <div class="resources" style="margin-top: 16px;">
                     <div class="resource-box brick">
                         <div class="label">🧱 Bricks</div>
-                        <div class="value" id="bricks-left">5</div>
+                        <div class="value" id="bricks-left">10</div>
                     </div>
                     <div class="resource-box ladder">
                         <div class="label">🪜 Ladders</div>
@@ -702,20 +702,25 @@
     ];
 
     // State
-    let heights = [4, 2, 7, 6, 9, 19, 12];
-    let totalBricks = 5;
+    let heights = [2, 5, 3, 8, 7, 14, 11];
+    let totalBricks = 10;
     let totalLadders = 1;
     let currentIndex = 0;
-    let bricksLeft = 5;
+    let bricksLeft = 10;
     let laddersUsed = [];
     let autoPlaying = false;
     let autoTimer = null;
     let simulationDone = false;
     let gapResources = []; // track what was used for each gap: {type:'ladder'|'brick'|'free'|'swapped', amount:N}
 
+    // Sub-step state for heap comparison visualization
+    let subStep = null; // null | 'show-arrows' | 'highlight-min'
+    let heapArrowGaps = []; // gap indices to show arrows above
+    let minHeapGapIdx = -1; // which gap has the min value
+
     // Presets
     const PRESETS = {
-        '1': { heights: [4, 2, 7, 6, 9, 19, 12], bricks: 5, ladders: 1 },
+        '1': { heights: [2, 5, 3, 8, 7, 14, 11], bricks: 10, ladders: 1 },
         '2': { heights: [4, 12, 2, 7, 3, 18, 20, 3, 19], bricks: 10, ladders: 2 },
         '3': { heights: [1, 3, 5, 7, 9, 11, 13], bricks: 4, ladders: 2 },
         '4': { heights: [1, 2, 3, 100, 3, 2, 1], bricks: 5, ladders: 0 },
@@ -749,6 +754,9 @@
         laddersUsed = []; // acts as our min-heap
         gapResources = [];
         simulationDone = false;
+        subStep = null;
+        heapArrowGaps = [];
+        minHeapGapIdx = -1;
         document.getElementById('log-panel').innerHTML = '';
         document.getElementById('status-result').textContent = '';
         document.getElementById('status-result').className = 'result';
@@ -796,6 +804,60 @@
             return;
         }
 
+        // --- Sub-step: show arrows above all ladder gaps ---
+        if (subStep === 'show-arrows') {
+            subStep = 'highlight-min';
+            const smallest = laddersUsed[0];
+            highlightCode(14); // heappop line
+            addLog(`  ↳ Heap min = ${smallest} (gap ${minHeapGapIdx}→${minHeapGapIdx + 1}). This is the smallest — swap it to bricks!`, 'swap');
+            drawSkyline();
+            return;
+        }
+
+        // --- Sub-step: execute the swap ---
+        if (subStep === 'highlight-min') {
+            const smallest = laddersUsed.shift();
+            bricksLeft -= smallest;
+            highlightCode(16); // bricks -= heappop
+            addLog(`  ↳ Swapped! Gap ${minHeapGapIdx}→${minHeapGapIdx + 1} (climb ${smallest}): ladder → bricks. Bricks left: ${bricksLeft}`, 'swap');
+
+            // Update gapResources
+            if (minHeapGapIdx >= 0) {
+                gapResources[minHeapGapIdx] = { type: 'brick', amount: smallest };
+            }
+
+            // Clear sub-step state
+            subStep = null;
+            heapArrowGaps = [];
+            minHeapGapIdx = -1;
+
+            updateHeapViz();
+            updateResourceDisplay();
+
+            if (bricksLeft < 0) {
+                const i = currentIndex;
+                highlightCode(19); // return i, stuck
+                addLog(`  ✗ Not enough bricks! Stuck at building ${i}.`, 'stuck');
+                simulationDone = true;
+                document.getElementById('status-result').textContent = `Stuck! Furthest = ${i}`;
+                document.getElementById('status-result').className = 'result fail';
+                document.getElementById('btn-step').disabled = true;
+                if (autoTimer) { clearInterval(autoTimer); autoPlaying = false; document.getElementById('btn-auto').textContent = '▶ Auto Play'; }
+                drawSkyline();
+                return;
+            }
+
+            currentIndex++;
+            updateStatus();
+            drawSkyline();
+
+            if (currentIndex >= heights.length - 1) {
+                setTimeout(() => finishSimulation(currentIndex), 300);
+            }
+            return;
+        }
+
+        // --- Normal step: process next gap ---
         const i = currentIndex;
         const diff = heights[i + 1] - heights[i];
 
@@ -813,8 +875,7 @@
             return;
         }
 
-        // Need to climb
-        // Step 1: push onto heap (use ladder)
+        // Need to climb — assign a ladder
         laddersUsed.push(diff);
         laddersUsed.sort((a, b) => a - b);
         highlightCode(12); // heappush
@@ -823,36 +884,35 @@
         updateHeapViz();
 
         if (laddersUsed.length > totalLadders) {
-            // Swap smallest for bricks
-            const smallest = laddersUsed.shift();
-            bricksLeft -= smallest;
-            highlightCode(16); // heappop + bricks
-            addLog(`  ↳ Over ladder limit! Swap smallest climb (${smallest}) from ladder → bricks. Bricks left: ${bricksLeft}`, 'swap');
-            // Find which gap had this climb and mark it as swapped to bricks
+            // Over limit! Enter compare sub-steps instead of swapping immediately
+            subStep = 'show-arrows';
+
+            // Find all gaps currently assigned a ladder
+            heapArrowGaps = [];
+            for (let g = 0; g < gapResources.length; g++) {
+                if (gapResources[g] && gapResources[g].type === 'ladder') {
+                    heapArrowGaps.push(g);
+                }
+            }
+
+            // Find the gap with the min value
+            const smallest = laddersUsed[0];
+            minHeapGapIdx = -1;
             for (let g = 0; g < gapResources.length; g++) {
                 if (gapResources[g] && gapResources[g].type === 'ladder' && gapResources[g].amount === smallest) {
-                    gapResources[g] = { type: 'brick', amount: smallest };
+                    minHeapGapIdx = g;
                     break;
                 }
             }
-            // The current gap keeps ladder if it wasn't the one swapped
-            updateHeapViz();
-        }
 
-        updateResourceDisplay();
-
-        if (bricksLeft < 0) {
-            highlightCode(19); // return i, stuck
-            addLog(`  ✗ Not enough bricks! Stuck at building ${i}.`, 'stuck');
-            simulationDone = true;
-            document.getElementById('status-result').textContent = `Stuck! Furthest = ${i}`;
-            document.getElementById('status-result').className = 'result fail';
-            document.getElementById('btn-step').disabled = true;
-            if (autoTimer) { clearInterval(autoTimer); autoPlaying = false; document.getElementById('btn-auto').textContent = '▶ Auto Play'; }
+            addLog(`  ↳ Over ladder limit (${totalLadders})! Which climb should use bricks instead? Comparing...`, 'swap');
+            updateResourceDisplay();
             drawSkyline();
-            return;
+            return; // Wait for next click
         }
 
+        // No swap needed — just advance
+        updateResourceDisplay();
         currentIndex++;
         updateStatus();
         drawSkyline();
@@ -1115,6 +1175,66 @@
             ctx.font = '18px serif';
             ctx.textAlign = 'center';
             ctx.fillText('🧗', px, py);
+        }
+
+        // --- Heap comparison arrows ---
+        if (heapArrowGaps.length > 0 && (subStep === 'show-arrows' || subStep === 'highlight-min')) {
+            heapArrowGaps.forEach(g => {
+                const gx = startX + g * (barW + gapW) + barW + gapW / 2;
+                const topOfGap = baseY - Math.max(heights[g], heights[g + 1]) * scaleH;
+                const isMin = (g === minHeapGapIdx);
+                const showMin = (subStep === 'highlight-min');
+                const arrowY = topOfGap - 50;
+                const arrowSize = (isMin && showMin) ? 14 : 8;
+                const labelOffset = (isMin && showMin) ? -24 : -16;
+
+                ctx.save();
+                if (isMin && showMin) {
+                    // Min arrow: big, red, glowing
+                    ctx.shadowColor = '#ff5252';
+                    ctx.shadowBlur = 15;
+                    ctx.fillStyle = '#ff5252';
+                } else if (isMin && subStep === 'show-arrows') {
+                    // Min arrow: show but not yet emphasized
+                    ctx.fillStyle = 'rgba(255, 215, 64, 0.8)';
+                } else {
+                    // Non-min arrows: teal
+                    ctx.fillStyle = 'rgba(100, 255, 218, 0.7)';
+                }
+
+                // Draw ▼ triangle
+                ctx.beginPath();
+                ctx.moveTo(gx - arrowSize, arrowY);
+                ctx.lineTo(gx + arrowSize, arrowY);
+                ctx.lineTo(gx, arrowY + arrowSize + 4);
+                ctx.closePath();
+                ctx.fill();
+
+                // Dashed line from arrow to gap
+                ctx.strokeStyle = ctx.fillStyle;
+                ctx.lineWidth = (isMin && showMin) ? 2.5 : 1;
+                ctx.setLineDash([3, 3]);
+                ctx.beginPath();
+                ctx.moveTo(gx, arrowY + arrowSize + 4);
+                ctx.lineTo(gx, topOfGap - 14);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                // Value label above arrow
+                ctx.font = (isMin && showMin)
+                    ? 'bold 13px JetBrains Mono, monospace'
+                    : '11px JetBrains Mono, monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText(gapResources[g].amount, gx, arrowY + labelOffset);
+
+                // "MIN" label for highlighted min
+                if (isMin && showMin) {
+                    ctx.font = 'bold 9px Inter, sans-serif';
+                    ctx.fillText('MIN ↓', gx, arrowY + labelOffset - 13);
+                }
+
+                ctx.restore();
+            });
         }
 
         // Ground line
