@@ -861,6 +861,7 @@
     let segHighlightNodes = []; // indices in segTree array that are highlighted
     let segHighlightMode = ''; // 'update' or 'query'
     let segQueryRangeNodes = []; // nodes involved in query answer
+    let segTraversedEdges = []; // [{from, to}] edges traversed during query
 
     // ==============================
     // BIT implementation
@@ -923,12 +924,21 @@
     }
 
     function segQuery(node, start, end, l, r) {
-        if (r < start || end < l) return { sum: 0, nodes: [] };
-        if (l <= start && end <= r) return { sum: segTree[node], nodes: [node] };
+        if (r < start || end < l) return { sum: 0, nodes: [], edges: [] };
+        if (l <= start && end <= r) return { sum: segTree[node], nodes: [node], edges: [] };
         const mid = Math.floor((start + end) / 2);
-        const left = segQuery(2 * node, start, mid, l, r);
-        const right = segQuery(2 * node + 1, mid + 1, end, l, r);
-        return { sum: left.sum + right.sum, nodes: [...left.nodes, ...right.nodes] };
+        const leftRes = segQuery(2 * node, start, mid, l, r);
+        const rightRes = segQuery(2 * node + 1, mid + 1, end, l, r);
+        // Collect edges: parent → child for every branch we actually descended into
+        const edges = [...leftRes.edges, ...rightRes.edges];
+        // Only add edge if that subtree contributed (had nodes or was traversed deeper)
+        if (leftRes.nodes.length > 0 || leftRes.edges.length > 0) {
+            edges.push({ from: node, to: 2 * node });
+        }
+        if (rightRes.nodes.length > 0 || rightRes.edges.length > 0) {
+            edges.push({ from: node, to: 2 * node + 1 });
+        }
+        return { sum: leftRes.sum + rightRes.sum, nodes: [...leftRes.nodes, ...rightRes.nodes], edges };
     }
 
     function bitUpdate(index, newVal) {
@@ -1057,6 +1067,7 @@
         const segResult = segQuery(1, 0, nums.length - 1, left, right);
         segHighlightNodes = segResult.nodes;
         segQueryRangeNodes = segResult.nodes;
+        segTraversedEdges = segResult.edges;
         segHighlightMode = 'query';
 
         highlightRange(left, right);
@@ -1086,6 +1097,7 @@
             highlightedTreeNodes = [];
             segHighlightNodes = [];
             segQueryRangeNodes = [];
+            segTraversedEdges = [];
             renderArray();
             drawTree();
             drawSegTree();
@@ -1309,25 +1321,59 @@
                 const rightX = (x + xMax) / 2;
                 const childY = 30 + (level + 1) * levelHeight;
 
+                // Check if each edge is in the traversed set
+                const leftEdgeTraversed = segTraversedEdges.some(e => e.from === node && e.to === 2 * node);
+                const rightEdgeTraversed = segTraversedEdges.some(e => e.from === node && e.to === 2 * node + 1);
+                const leftChildHighlighted = segHighlightNodes.includes(2 * node);
+                const rightChildHighlighted = segHighlightNodes.includes(2 * node + 1);
+
                 // Left edge
-                ctx.strokeStyle = segHighlightNodes.includes(2 * node) 
-                    ? (segHighlightMode === 'update' ? 'rgba(255, 171, 64, 0.7)' : 'rgba(79, 195, 247, 0.7)')
-                    : 'rgba(92, 107, 192, 0.3)';
-                ctx.lineWidth = segHighlightNodes.includes(2 * node) ? 2.5 : 1;
-                ctx.beginPath();
-                ctx.moveTo(x, y + nodeRadius);
-                ctx.lineTo(leftX, childY - nodeRadius);
-                ctx.stroke();
+                if (leftEdgeTraversed && segHighlightMode === 'query') {
+                    // Glowing traversed edge
+                    ctx.save();
+                    ctx.shadowColor = '#4fc3f7';
+                    ctx.shadowBlur = 12;
+                    ctx.strokeStyle = 'rgba(79, 195, 247, 0.9)';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.moveTo(x, y + nodeRadius);
+                    ctx.lineTo(leftX, childY - nodeRadius);
+                    ctx.stroke();
+                    ctx.restore();
+                } else {
+                    ctx.strokeStyle = leftChildHighlighted
+                        ? (segHighlightMode === 'update' ? 'rgba(255, 171, 64, 0.7)' : 'rgba(79, 195, 247, 0.7)')
+                        : 'rgba(92, 107, 192, 0.3)';
+                    ctx.lineWidth = leftChildHighlighted ? 2.5 : 1;
+                    ctx.beginPath();
+                    ctx.moveTo(x, y + nodeRadius);
+                    ctx.lineTo(leftX, childY - nodeRadius);
+                    ctx.stroke();
+                }
 
                 // Right edge
-                ctx.strokeStyle = segHighlightNodes.includes(2 * node + 1)
-                    ? (segHighlightMode === 'update' ? 'rgba(255, 171, 64, 0.7)' : 'rgba(79, 195, 247, 0.7)')
-                    : 'rgba(92, 107, 192, 0.3)';
-                ctx.lineWidth = segHighlightNodes.includes(2 * node + 1) ? 2.5 : 1;
-                ctx.beginPath();
-                ctx.moveTo(x, y + nodeRadius);
-                ctx.lineTo(rightX, childY - nodeRadius);
-                ctx.stroke();
+                if (rightEdgeTraversed && segHighlightMode === 'query') {
+                    // Glowing traversed edge
+                    ctx.save();
+                    ctx.shadowColor = '#4fc3f7';
+                    ctx.shadowBlur = 12;
+                    ctx.strokeStyle = 'rgba(79, 195, 247, 0.9)';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.moveTo(x, y + nodeRadius);
+                    ctx.lineTo(rightX, childY - nodeRadius);
+                    ctx.stroke();
+                    ctx.restore();
+                } else {
+                    ctx.strokeStyle = rightChildHighlighted
+                        ? (segHighlightMode === 'update' ? 'rgba(255, 171, 64, 0.7)' : 'rgba(79, 195, 247, 0.7)')
+                        : 'rgba(92, 107, 192, 0.3)';
+                    ctx.lineWidth = rightChildHighlighted ? 2.5 : 1;
+                    ctx.beginPath();
+                    ctx.moveTo(x, y + nodeRadius);
+                    ctx.lineTo(rightX, childY - nodeRadius);
+                    ctx.stroke();
+                }
 
                 // Draw children
                 drawNode(2 * node, start, mid, level + 1, xMin, x);
