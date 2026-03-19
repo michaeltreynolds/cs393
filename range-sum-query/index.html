@@ -2709,6 +2709,18 @@
         const layout=getSegTreeLayout(W, treeH, n);
         for (const p of Object.values(layout.positions)) p.y+=22;
 
+        // Gather leaf positions for morph build
+        const leafNodes=[];
+        for (const [ni,pos] of Object.entries(layout.positions)) {
+            if (pos.start===pos.end) leafNodes.push({nodeIdx:parseInt(ni),...pos});
+        }
+        leafNodes.sort((a,b)=>a.start-b.start);
+        const boxW=Math.min(40,(W-60)/n), boxH=boxW;
+        const totalBoxW=boxW*n, flatStartX=(W-totalBoxW)/2, flatY=H*0.45;
+        const flatPositions=leafNodes.map((_,i)=>({
+            x:flatStartX+i*boxW+boxW/2, y:flatY, w:boxW, h:boxH
+        }));
+
         // Pre-generate all op steps sequentially
         const opData=[];
         for (const op of LD_OPS) {
@@ -2724,9 +2736,11 @@
 
         largeDemoState={
             start:performance.now(), dArr:[...LD_ARR], dTree:ldBuild([...LD_ARR]),
-            layout, n, W, H, opData, phase:'build', phaseStart:performance.now(),
+            layout, n, W, H, opData, phase:'morph1', phaseStart:performance.now(),
             currentOp:0, nodeStates:new Map(),
-            BUILD_DUR:2500, LABEL_DUR:1500, STEP_Q:320, STEP_U:420, RESULT_DUR:2000, FADE_DUR:800,
+            leafNodes, flatPositions,
+            MORPH1_DUR:1200, MORPH2_DUR:1500, BUILD_DUR:1800,
+            LABEL_DUR:1500, STEP_Q:320, STEP_U:420, RESULT_DUR:2000, FADE_DUR:800,
         };
         document.getElementById('btn-large-demo').textContent='⏹ Stop';
         document.getElementById('build-anim-status').textContent='Building 32-element tree...';
@@ -2747,11 +2761,85 @@
         const {layout,n,opData}=s, {nodeRadius}=layout;
         const arrY=H*0.78; // array top
 
-        if (s.phase==='build') {
-            const lvl=Math.min(layout.depth, Math.floor(elapsed/(s.BUILD_DUR/(layout.depth+1))));
-            document.getElementById('build-anim-status').textContent=`Building... level ${lvl}/${layout.depth}`;
-            ldDrawTree(ctx,s,layout,nodeRadius,lvl,null);
+        if (s.phase==='morph1') {
+            // Phase: flat array boxes appear
+            document.getElementById('build-anim-status').textContent='Array: [3,1,4,1,5,9,2,6,...]';
+            const alpha=easeInOut(Math.min(1,elapsed/(s.MORPH1_DUR*0.5)));
+            s.leafNodes.forEach((leaf,i)=>{
+                const fp=s.flatPositions[i];
+                ctx.globalAlpha=alpha;
+                ctx.fillStyle='#16213e'; ctx.strokeStyle='#283593'; ctx.lineWidth=2;
+                ctx.beginPath(); ctx.rect(fp.x-fp.w/2,fp.y-fp.h/2,fp.w,fp.h); ctx.fill(); ctx.stroke();
+                ctx.fillStyle='#e8eaf6'; ctx.font=`bold ${Math.min(12,fp.w*0.4)}px JetBrains Mono,monospace`;
+                ctx.textAlign='center'; ctx.textBaseline='middle';
+                ctx.fillText(LD_ARR[leaf.start],fp.x,fp.y);
+                ctx.fillStyle='#5c6bc0'; ctx.font=`${Math.min(8,fp.w*0.3)}px JetBrains Mono,monospace`;
+                ctx.fillText(`[${leaf.start}]`,fp.x,fp.y+fp.h/2+10);
+                ctx.globalAlpha=1;
+            });
+            if (elapsed>=s.MORPH1_DUR) { s.phase='morph2'; s.phaseStart=now; }
+        } else if (s.phase==='morph2') {
+            // Phase: morph boxes into tree nodes
+            document.getElementById('build-anim-status').textContent='Building segment tree...';
+            const t=easeInOut(Math.min(1,elapsed/s.MORPH2_DUR));
+            // Draw edges fading in
+            if (t>0.4) {
+                ctx.globalAlpha=(t-0.4)/0.6*0.3;
+                for (const [ni,pos] of Object.entries(layout.positions)) {
+                    const nd=parseInt(ni);
+                    if (pos.start!==pos.end) {
+                        const lc=layout.positions[2*nd],rc=layout.positions[2*nd+1];
+                        ctx.strokeStyle='rgba(92,107,192,0.25)'; ctx.lineWidth=1;
+                        if(lc){ctx.beginPath();ctx.moveTo(pos.x,pos.y+nodeRadius);ctx.lineTo(lc.x,lc.y-nodeRadius);ctx.stroke();}
+                        if(rc){ctx.beginPath();ctx.moveTo(pos.x,pos.y+nodeRadius);ctx.lineTo(rc.x,rc.y-nodeRadius);ctx.stroke();}
+                    }
+                }
+                ctx.globalAlpha=1;
+            }
+            // Leaves morph from flat to tree position
+            s.leafNodes.forEach((leaf,i)=>{
+                const fp=s.flatPositions[i];
+                const cx=fp.x+(leaf.x-fp.x)*t, cy=fp.y+(leaf.y-fp.y)*t;
+                const halfW=fp.w/2*(1-t)+nodeRadius*t, halfH=fp.h/2*(1-t)+nodeRadius*t;
+                ctx.fillStyle='#16213e';
+                ctx.beginPath();
+                if(t<0.9) ctx.roundRect(cx-halfW,cy-halfH,halfW*2,halfH*2,nodeRadius*t);
+                else ctx.arc(cx,cy,nodeRadius,0,Math.PI*2);
+                ctx.fill();
+                ctx.strokeStyle='#283593'; ctx.lineWidth=1.5;
+                ctx.beginPath();
+                if(t<0.9) ctx.roundRect(cx-halfW,cy-halfH,halfW*2,halfH*2,nodeRadius*t);
+                else ctx.arc(cx,cy,nodeRadius,0,Math.PI*2);
+                ctx.stroke();
+                ctx.fillStyle='#e8eaf6'; ctx.font=`bold ${Math.min(9,nodeRadius*0.75)}px JetBrains Mono,monospace`;
+                ctx.textAlign='center'; ctx.textBaseline='middle';
+                ctx.fillText(LD_ARR[leaf.start],cx,cy);
+            });
+            // Internal nodes fade in
+            if (t>0.5) {
+                const ia=Math.min(1,(t-0.5)/0.5);
+                ctx.globalAlpha=ia;
+                for (const [ni,pos] of Object.entries(layout.positions)) {
+                    if (pos.start===pos.end) continue;
+                    const nd=parseInt(ni);
+                    ctx.fillStyle='#16213e'; ctx.beginPath(); ctx.arc(pos.x,pos.y,nodeRadius,0,Math.PI*2); ctx.fill();
+                    ctx.strokeStyle='#283593'; ctx.lineWidth=1;
+                    ctx.beginPath(); ctx.arc(pos.x,pos.y,nodeRadius,0,Math.PI*2); ctx.stroke();
+                    ctx.fillStyle='#e8eaf6'; ctx.font=`bold ${Math.min(9,nodeRadius*0.75)}px JetBrains Mono,monospace`;
+                    ctx.textAlign='center'; ctx.textBaseline='middle';
+                    ctx.fillText(s.dTree[nd],pos.x,pos.y);
+                }
+                ctx.globalAlpha=1;
+            }
+            if (elapsed>=s.MORPH2_DUR) { s.phase='build_arr'; s.phaseStart=now; }
+        } else if (s.phase==='build_arr') {
+            // Show full tree + array fading in at bottom
+            document.getElementById('build-anim-status').textContent='Ready — 32 elements, 63 nodes';
+            ldDrawTree(ctx,s,layout,nodeRadius,layout.depth,null);
+            const a=easeInOut(Math.min(1,elapsed/800));
+            ctx.globalAlpha=a;
             ldDrawArr(ctx,s,W,arrY,-1,-1,-1);
+            ctx.globalAlpha=1;
             if (elapsed>=s.BUILD_DUR) { s.phase='label'; s.phaseStart=now; s.nodeStates.clear(); }
         } else if (s.phase==='label') {
             const op=opData[s.currentOp], a=easeInOut(Math.min(1,elapsed/500));
@@ -2796,7 +2884,7 @@
         } else if (s.phase==='result') {
             const op=opData[s.currentOp];
             for (const step of op.steps) ldApply(s,step,op);
-            if (op.type==='update' && op.newTree) { s.dTree=[...op.newTree]; s.dArr[op.index]=op.nv; }
+            // dTree and dArr are already updated by ldApply for update ops
             ldDrawTree(ctx,s,layout,nodeRadius,layout.depth,null);
             const qL=op.type==='query'?op.left:-1, qR=op.type==='query'?op.right:-1;
             ldDrawArr(ctx,s,W,arrY,qL,qR,op.type==='update'?op.index:-1);
@@ -2832,12 +2920,28 @@
 
     function ldApply(s,step,op) {
         if (step.t==='out') s.nodeStates.set(step.nd,'out');
-        else if (step.t==='full') s.nodeStates.set(step.nd,'full');
+        else if (step.t==='full') {
+            s.nodeStates.set(step.nd,'full');
+            // Ghost all descendants — this IS the O(log n) insight
+            function ghostChildren(nd) {
+                const lc=2*nd, rc=2*nd+1;
+                if (s.layout.positions[lc]) { s.nodeStates.set(lc,'ghost'); ghostChildren(lc); }
+                if (s.layout.positions[rc]) { s.nodeStates.set(rc,'ghost'); ghostChildren(rc); }
+            }
+            ghostChildren(step.nd);
+        }
         else if (step.t==='part') s.nodeStates.set(step.nd,'part');
         else if (step.t==='pdone') s.nodeStates.set(step.nd,'pdone');
         else if (step.t==='down') s.nodeStates.set(step.nd,'upath');
-        else if (step.t==='leaf') { s.nodeStates.set(step.nd,'uleaf'); }
-        else if (step.t==='up') s.nodeStates.set(step.nd,'udone');
+        else if (step.t==='leaf') {
+            s.nodeStates.set(step.nd,'uleaf');
+            s.dTree[step.nd]=step.nv; // Update leaf value immediately
+            s.dArr[step.s]=step.nv;   // Update array display too
+        }
+        else if (step.t==='up') {
+            s.nodeStates.set(step.nd,'udone');
+            s.dTree[step.nd]=step.nv; // Update parent sum immediately
+        }
     }
 
     function ldDrawTree(ctx,s,layout,r,maxLvl,activeStep) {
@@ -2848,13 +2952,15 @@
             if (pos.start!==pos.end && pos.level<maxLvl) {
                 const lc=positions[2*nd], rc=positions[2*nd+1];
                 const st=s.nodeStates.get(nd);
+                // Check if either child is ghosted — if so, dim the edge
+                const lcSt=lc?s.nodeStates.get(2*nd):null, rcSt=rc?s.nodeStates.get(2*nd+1):null;
                 let col='rgba(92,107,192,0.25)', lw=1;
                 if (st==='full') { col='rgba(105,240,174,0.4)'; lw=1.5; }
                 else if (st==='part'||st==='pdone') { col='rgba(255,215,64,0.4)'; lw=1.5; }
                 else if (st==='upath'||st==='udone') { col='rgba(77,208,225,0.5)'; lw=1.5; }
-                ctx.strokeStyle=col; ctx.lineWidth=lw;
-                if (lc) { ctx.beginPath(); ctx.moveTo(pos.x,pos.y+r); ctx.lineTo(lc.x,lc.y-r); ctx.stroke(); }
-                if (rc) { ctx.beginPath(); ctx.moveTo(pos.x,pos.y+r); ctx.lineTo(rc.x,rc.y-r); ctx.stroke(); }
+                ctx.lineWidth=lw;
+                if (lc) { ctx.strokeStyle=(lcSt==='ghost')?'rgba(92,107,192,0.06)':col; ctx.beginPath(); ctx.moveTo(pos.x,pos.y+r); ctx.lineTo(lc.x,lc.y-r); ctx.stroke(); }
+                if (rc) { ctx.strokeStyle=(rcSt==='ghost')?'rgba(92,107,192,0.06)':col; ctx.beginPath(); ctx.moveTo(pos.x,pos.y+r); ctx.lineTo(rc.x,rc.y-r); ctx.stroke(); }
             }
         }
         // Nodes
@@ -2862,15 +2968,16 @@
             if (pos.level>maxLvl) continue;
             const nd=parseInt(ni), st=s.nodeStates.get(nd), isLeaf=pos.start===pos.end;
             let fill, stroke, glow=null, showVal=true, textCol='#e8eaf6';
-            if (!st) { fill=isLeaf?'#3da35a':'#16213e'; stroke=isLeaf?'#2d8044':'#283593'; }
+            if (!st) { fill='#16213e'; stroke='#283593'; }
             else if (st==='full') { fill='#2e7d32'; stroke='#4caf50'; glow='#69f0ae'; }
+            else if (st==='ghost') { fill='rgba(22,33,62,0.1)'; stroke='rgba(40,53,147,0.08)'; textCol='rgba(232,234,246,0.08)'; }
             else if (st==='out') { fill='rgba(22,33,62,0.25)'; stroke='rgba(40,53,147,0.25)'; textCol='rgba(232,234,246,0.2)'; }
             else if (st==='part') { fill='#1a237e'; stroke='#ffd740'; glow='#ffd740'; }
             else if (st==='pdone') { fill='#16213e'; stroke='#ffd740'; }
             else if (st==='upath') { fill=isLeaf?'#00897b':'#006064'; stroke='#4dd0e1'; glow='#4dd0e1'; }
             else if (st==='uleaf') { fill='#e65100'; stroke='#ff6d00'; glow='#ffab40'; }
             else if (st==='udone') { fill='#004d40'; stroke='#26a69a'; glow='#69f0ae'; }
-            else { fill=isLeaf?'#3da35a':'#16213e'; stroke=isLeaf?'#2d8044':'#283593'; }
+            else { fill='#16213e'; stroke='#283593'; }
 
             ctx.save();
             if (glow) { ctx.shadowColor=glow; ctx.shadowBlur=8; }
