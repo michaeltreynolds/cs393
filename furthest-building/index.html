@@ -1067,12 +1067,17 @@
                         const ly2 = topOfTaller;
                         const ladderH = ly1 - ly2;
 
+                        // Provisional ladder (just placed, over limit) renders white
+                        const isProvisional = (subStep === 'show-arrows' || subStep === 'highlight-min') && i === currentIndex;
+                        const ladderColor = isProvisional ? 'rgba(255,255,255,0.7)' : '#69f0ae';
+                        const ladderGlow = isProvisional ? 'rgba(255,255,255,0.5)' : '#69f0ae';
+
                         // Glow
-                        ctx.shadowColor = '#69f0ae';
+                        ctx.shadowColor = ladderGlow;
                         ctx.shadowBlur = 8;
 
                         // Rails
-                        ctx.strokeStyle = '#69f0ae';
+                        ctx.strokeStyle = ladderColor;
                         ctx.lineWidth = 2;
                         ctx.beginPath();
                         ctx.moveTo(lx, ly1);
@@ -1094,10 +1099,10 @@
                         ctx.shadowBlur = 0;
 
                         // Label
-                        ctx.fillStyle = '#69f0ae';
+                        ctx.fillStyle = ladderColor;
                         ctx.font = 'bold 9px JetBrains Mono, monospace';
                         ctx.textAlign = 'center';
-                        ctx.fillText('🪜', gapCenterX, ly2 - 8);
+                        ctx.fillText(isProvisional ? '🪜?' : '🪜', gapCenterX, ly2 - 8);
 
                     } else if (resource && resource.type === 'brick') {
                         // Draw stacked bricks
