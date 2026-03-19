@@ -1182,7 +1182,15 @@
             const el = document.getElementById(`code-line-${lineIdx}`);
             if (el) {
                 el.classList.add('active');
-                el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                // Scroll within the code panel only, not the whole page
+                const panel = document.getElementById('code-panel');
+                if (panel) {
+                    const panelRect = panel.getBoundingClientRect();
+                    const elRect = el.getBoundingClientRect();
+                    if (elRect.top < panelRect.top || elRect.bottom > panelRect.bottom) {
+                        panel.scrollTop += elRect.top - panelRect.top - panelRect.height / 2;
+                    }
+                }
             }
         }
     }
