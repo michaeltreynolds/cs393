@@ -433,44 +433,6 @@
             to { opacity: 1; transform: translateY(0); }
         }
 
-        /* Gospel connection */
-        .gospel-card {
-            grid-column: 1 / -1;
-            background: linear-gradient(135deg, rgba(179, 136, 255, 0.08), rgba(79, 195, 247, 0.05));
-            border: 1px solid rgba(179, 136, 255, 0.2);
-        }
-
-        .gospel-card .card-title::before {
-            background: linear-gradient(to bottom, var(--accent-purple), var(--accent-yellow));
-        }
-
-        .gospel-card blockquote {
-            border-left: 3px solid var(--accent-purple);
-            padding: 12px 16px;
-            margin: 12px 0;
-            background: rgba(179, 136, 255, 0.05);
-            border-radius: 0 8px 8px 0;
-            font-style: italic;
-            color: var(--text-secondary);
-            line-height: 1.7;
-        }
-
-        .gospel-card .scripture-ref {
-            color: var(--accent-purple);
-            font-weight: 600;
-            font-style: normal;
-        }
-
-        .gospel-body {
-            color: var(--text-secondary);
-            line-height: 1.7;
-            font-size: 0.95rem;
-        }
-
-        .gospel-body strong {
-            color: var(--accent-yellow);
-        }
-
         /* Problem statement card */
         .problem-card {
             grid-column: 1 / -1;
@@ -532,7 +494,7 @@
         /* Responsive */
         @media (max-width: 900px) {
             .main-grid { grid-template-columns: 1fr; }
-            .viz-container, .gospel-card, .problem-card { grid-column: 1; }
+            .viz-container, .problem-card { grid-column: 1; }
         }
 
         /* Scrollbar */
@@ -653,22 +615,6 @@
                 <div class="log-panel" id="log-panel"></div>
             </div>
 
-            <!-- Gospel Connection -->
-            <div class="card gospel-card">
-                <div class="card-title">💡 Gospel Connection — Stewardship of Resources</div>
-                <div class="gospel-body">
-                    <p>In this problem, we learn that <strong>wise allocation</strong> of limited resources (bricks and ladders) determines how far we can go. The greedy insight is to <strong>save ladders for the biggest challenges</strong> and use bricks for smaller obstacles.</p>
-
-                    <blockquote>
-                        "It is wisdom in me; therefore, a commandment I give unto you, that ye shall organize yourselves and appoint every man his <strong>stewardship</strong>; That every man may give an account unto me of the stewardship which is appointed unto him."
-                        <br><span class="scripture-ref">— Doctrine & Covenants 104:11–12</span>
-                    </blockquote>
-
-                    <p>Just as the algorithm must wisely decide when to use each resource, we are called to be <strong>faithful stewards</strong> of our time, talents, and means. The Lord doesn't ask us to have unlimited resources — He asks us to <strong>use what we have wisely</strong>. Sometimes the right decision is to hold back our best effort for the challenges that truly require it.</p>
-
-                    <p>The min-heap represents a beautiful principle: <strong>re-evaluate past decisions in light of new information</strong>. When a bigger challenge appears, we can reassign our ladder. In life, as we gain greater light and knowledge, it is wise to <strong>reprioritize</strong> and ensure our greatest efforts are directed toward the things that matter most.</p>
-                </div>
-            </div>
         </div>
     </div>
 
