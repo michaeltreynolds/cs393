@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Random Progress Check</title>
+<style>
+  html, body { height: 100%; margin: 0; }
+  body {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4vh;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif; background: #f5f7fa; color: #002e5d;
+  }
+  #num { font-size: min(55vh, 70vw); font-weight: 800; line-height: 1; min-height: 1em; }
+  #label { font-size: 3vh; color: #555; min-height: 1.2em; margin-top: -3vh; }
+  button {
+    font-size: 5vh; font-weight: 700; padding: 2.5vh 6vw; border: none; border-radius: 1.5vh;
+    background: #002e5d; color: #fff; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,.2);
+  }
+  button:active { transform: translateY(2px); }
+  .flash { animation: pop .35s ease-out; }
+  @keyframes pop { from { transform: scale(.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+</style>
+</head>
+<body>
+  <div id="num"></div>
+  <div id="label"></div>
+  <button id="go">Get Number</button>
+<script>
+  const num = document.getElementById("num");
+  const label = document.getElementById("label");
+  document.getElementById("go").addEventListener("click", () => {
+    const n = (crypto.getRandomValues(new Uint32Array(1))[0] % 3) + 1;
+    num.textContent = n;
+    label.textContent = "Progress Check " + n;
+    num.classList.remove("flash"); void num.offsetWidth; num.classList.add("flash");
+  });
+</script>
+</body>
+</html>
